@@ -1,8 +1,11 @@
 .vscode/**
 .vscode-test/**
+.github/**
 node_modules/**
 **/*.ts
 **/*.map
 tsconfig.json
 .gitignore
+.vscodeignore
 plan-*.md
+assets/logo.png

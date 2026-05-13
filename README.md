@@ -41,7 +41,7 @@ GitFocal has no build step — the extension runs directly from `src/`. Packagin
 ### Prerequisites
 
 - `git` on `PATH`
-- - [Node.js](https://nodejs.org/) 18+ (for `npx`, only needed to create a package locally)
+- [Node.js](https://nodejs.org/) 18+ (for `npx`, only needed to create a package locally)
 
 ### Package
 
