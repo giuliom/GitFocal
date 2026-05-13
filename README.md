@@ -1,5 +1,7 @@
 # GitFocal
 
+[![Package VSIX](https://github.com/giuliom/GitFocal/actions/workflows/package.yml/badge.svg)](https://github.com/giuliom/GitFocal/actions/workflows/package.yml)
+
 <img src="assets/icon.png" alt="GitFocal icon" width="128" />
 
 A no-frills Visual Studio Code extension for Git. GitFocal adds two focused views to the Source Control side bar — **Branches** and **Stashes** — with zero runtime dependencies (it shells out to your local `git`).
