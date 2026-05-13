@@ -82,6 +82,9 @@ src/
 
 ## TODO
 
+- [ ] Update logo
+- [ ] Improve artifact upload
+- [ ] Ensure cross platform functionality
 - [ ] Commit list for branches
 - [ ] Better support for worktrees and submodules
 - [ ] Diff viewer integration for stashes
