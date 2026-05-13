@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "create-package",
+      "type": "shell",
+      "command": "npx @vscode/vsce package -o build",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "detail": "Package the extension into a VSIX under the build directory"
+    }
+  ]
+}

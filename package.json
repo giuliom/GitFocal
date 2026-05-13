@@ -1,0 +1,179 @@
+{
+  "name": "gitfocal",
+  "displayName": "GitFocal",
+  "description": "Lightweight Git branches & stashes views for VS Code with zero runtime dependencies.",
+  "version": "0.1.0",
+  "publisher": "gitfocal",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/giuliom/GitFocal.git"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:gitfocal.branches",
+    "onView:gitfocal.stashes",
+    "onStartupFinished"
+  ],
+  "main": "./src/extension.js",
+  "icon": "assets/icon.png",
+  "contributes": {
+    "viewsContainers": {},
+    "views": {
+      "scm": [
+        { "id": "gitfocal.branches", "name": "Branches", "visibility": "visible" },
+        { "id": "gitfocal.stashes", "name": "Stashes", "visibility": "visible" }
+      ]
+    },
+    "commands": [
+      { "command": "gitfocal.refresh", "title": "GitFocal: Refresh", "icon": "$(refresh)" },
+      { "command": "gitfocal.createBranch", "title": "GitFocal: Create Branch", "icon": "$(add)" },
+      { "command": "gitfocal.fetchAll", "title": "GitFocal: Fetch All", "icon": "$(cloud-download)" },
+      { "command": "gitfocal.stashChanges", "title": "GitFocal: Stash Changes", "icon": "$(archive)" },
+      { "command": "gitfocal.toggleHideSubmodules", "title": "GitFocal: Toggle Hide Submodules" },
+      { "command": "gitfocal.hideSubmodules", "title": "GitFocal: Hide Submodules", "icon": "$(eye)" },
+      { "command": "gitfocal.showSubmodules", "title": "GitFocal: Show Submodules", "icon": "$(eye-closed)" },
+
+      { "command": "gitfocal.checkoutBranch", "title": "Checkout", "icon": "$(check)" },
+      { "command": "gitfocal.createBranchFrom", "title": "Create Branch From..." },
+      { "command": "gitfocal.renameBranch", "title": "Rename..." },
+      { "command": "gitfocal.deleteBranch", "title": "Delete", "icon": "$(trash)" },
+      { "command": "gitfocal.deleteBranchForce", "title": "Delete (force)" },
+      { "command": "gitfocal.fetch", "title": "Fetch", "icon": "$(cloud-download)" },
+      { "command": "gitfocal.pull", "title": "Pull", "icon": "$(repo-pull)" },
+      { "command": "gitfocal.push", "title": "Push", "icon": "$(repo-push)" },
+      { "command": "gitfocal.pushSetUpstream", "title": "Publish Branch", "icon": "$(cloud-upload)" },
+      { "command": "gitfocal.merge", "title": "Merge into Current" },
+      { "command": "gitfocal.rebase", "title": "Rebase Current onto..." },
+      { "command": "gitfocal.squash", "title": "Squash Commits" },
+      { "command": "gitfocal.reset", "title": "Reset Current to..." },
+      { "command": "gitfocal.changeUpstream", "title": "Change Upstream..." },
+      { "command": "gitfocal.copyName", "title": "Copy Branch Name" },
+      { "command": "gitfocal.copyUpstream", "title": "Copy Upstream Name" },
+      { "command": "gitfocal.copyCommitHash", "title": "Copy Commit Hash" },
+
+      { "command": "gitfocal.stashApply", "title": "Apply", "icon": "$(check)" },
+      { "command": "gitfocal.stashPop", "title": "Pop", "icon": "$(arrow-up)" },
+      { "command": "gitfocal.stashDelete", "title": "Delete", "icon": "$(trash)" },
+      { "command": "gitfocal.stashRename", "title": "Rename...", "icon": "$(pencil)" },
+
+      { "command": "gitfocal.stashAllChanges", "title": "Stash All Changes", "icon": "$(archive)" },
+      { "command": "gitfocal.stashStagedChanges", "title": "Stash Staged Changes", "icon": "$(archive)" },
+      { "command": "gitfocal.stashUnstagedChanges", "title": "Stash Unstaged Changes", "icon": "$(archive)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "gitfocal.createBranch", "when": "view == gitfocal.branches", "group": "navigation@1" },
+        { "command": "gitfocal.fetchAll", "when": "view == gitfocal.branches", "group": "navigation@2" },
+        { "command": "gitfocal.refresh", "when": "view == gitfocal.branches", "group": "navigation@3" },
+        { "command": "gitfocal.hideSubmodules", "when": "view == gitfocal.branches && !gitfocal.hideSubmodules", "group": "navigation@4" },
+        { "command": "gitfocal.showSubmodules", "when": "view == gitfocal.branches && gitfocal.hideSubmodules", "group": "navigation@4" },
+        { "command": "gitfocal.stashChanges", "when": "view == gitfocal.stashes", "group": "navigation@1" },
+        { "command": "gitfocal.refresh", "when": "view == gitfocal.stashes", "group": "navigation@2" },
+        { "command": "gitfocal.hideSubmodules", "when": "view == gitfocal.stashes && !gitfocal.hideSubmodules", "group": "navigation@3" },
+        { "command": "gitfocal.showSubmodules", "when": "view == gitfocal.stashes && gitfocal.hideSubmodules", "group": "navigation@3" }
+      ],
+      "view/item/context": [
+        { "command": "gitfocal.pushSetUpstream", "when": "view == gitfocal.branches && viewItem =~ /^branch\\.(current|local)\\.untracked$/", "group": "inline@0" },
+        { "command": "gitfocal.checkoutBranch", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "inline@1" },
+        { "command": "gitfocal.fetch", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "inline@2" },
+        { "command": "gitfocal.pull", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "inline@3" },
+        { "command": "gitfocal.push", "when": "view == gitfocal.branches && viewItem =~ /^branch\\.(current|local)\\./", "group": "inline@4" },
+
+        { "command": "gitfocal.checkoutBranch", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "1_checkout@1" },
+        { "command": "gitfocal.fetch", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "2_remote@1" },
+        { "command": "gitfocal.pull", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "2_remote@2" },
+        { "command": "gitfocal.push", "when": "view == gitfocal.branches && viewItem =~ /^branch\\.(current|local)\\./", "group": "2_remote@3" },
+        { "command": "gitfocal.pushSetUpstream", "when": "view == gitfocal.branches && viewItem =~ /^branch\\.(current|local)\\.untracked$/", "group": "2_remote@3" },
+        { "command": "gitfocal.reset", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "3_history@1" },
+        { "command": "gitfocal.merge", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "3_history@2" },
+        { "command": "gitfocal.rebase", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "3_history@3" },
+        { "command": "gitfocal.squash", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "3_history@9" },
+        { "command": "gitfocal.changeUpstream", "when": "view == gitfocal.branches && viewItem =~ /^branch\\.(current|local)\\./", "group": "4_upstream@1" },
+        { "command": "gitfocal.renameBranch", "when": "view == gitfocal.branches && viewItem =~ /^branch\\.(current|local)\\./", "group": "7_modify@1" },
+        { "command": "gitfocal.deleteBranch", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "8_delete@1" },
+        { "command": "gitfocal.deleteBranchForce", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "8_delete@2" },
+        { "command": "gitfocal.copyName", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "9_copy@1" },
+        { "command": "gitfocal.copyUpstream", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "9_copy@2" },
+        { "command": "gitfocal.copyCommitHash", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "9_copy@3" },
+
+        { "command": "gitfocal.stashApply", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@1" },
+        { "command": "gitfocal.stashPop", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@2" },
+        { "command": "gitfocal.stashDelete", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@3" },
+
+        { "command": "gitfocal.stashApply", "when": "view == gitfocal.stashes && viewItem == stash", "group": "1_stash@1" },
+        { "command": "gitfocal.stashPop", "when": "view == gitfocal.stashes && viewItem == stash", "group": "1_stash@2" },
+        { "command": "gitfocal.stashRename", "when": "view == gitfocal.stashes && viewItem == stash", "group": "7_modify@1" },
+        { "command": "gitfocal.stashDelete", "when": "view == gitfocal.stashes && viewItem == stash", "group": "8_delete@1" }
+      ],
+      "scm/resourceState/context": [
+        { "command": "gitfocal.stashAllChanges", "when": "scmProvider == git", "group": "gitfocal@1" },
+        { "command": "gitfocal.stashStagedChanges", "when": "scmProvider == git", "group": "gitfocal@2" },
+        { "command": "gitfocal.stashUnstagedChanges", "when": "scmProvider == git", "group": "gitfocal@3" }
+      ],
+      "scm/resourceGroup/context": [
+        { "command": "gitfocal.stashAllChanges", "when": "scmProvider == git", "group": "gitfocal@1" },
+        { "command": "gitfocal.stashStagedChanges", "when": "scmProvider == git", "group": "gitfocal@2" },
+        { "command": "gitfocal.stashUnstagedChanges", "when": "scmProvider == git", "group": "gitfocal@3" }
+      ],
+      "scm/resourceFolder/context": [
+        { "command": "gitfocal.stashAllChanges", "when": "scmProvider == git", "group": "gitfocal@1" },
+        { "command": "gitfocal.stashStagedChanges", "when": "scmProvider == git", "group": "gitfocal@2" },
+        { "command": "gitfocal.stashUnstagedChanges", "when": "scmProvider == git", "group": "gitfocal@3" }
+      ],
+      "commandPalette": [
+        { "command": "gitfocal.checkoutBranch", "when": "false" },
+        { "command": "gitfocal.createBranchFrom", "when": "false" },
+        { "command": "gitfocal.deleteBranch", "when": "false" },
+        { "command": "gitfocal.deleteBranchForce", "when": "false" },
+        { "command": "gitfocal.fetch", "when": "false" },
+        { "command": "gitfocal.merge", "when": "false" },
+        { "command": "gitfocal.rebase", "when": "false" },
+        { "command": "gitfocal.changeUpstream", "when": "false" },
+        { "command": "gitfocal.copyName", "when": "false" },
+        { "command": "gitfocal.copyUpstream", "when": "false" },
+        { "command": "gitfocal.copyCommitHash", "when": "false" },
+        { "command": "gitfocal.stashApply", "when": "false" },
+        { "command": "gitfocal.stashPop", "when": "false" },
+        { "command": "gitfocal.stashDelete", "when": "false" },
+        { "command": "gitfocal.stashRename", "when": "false" },
+        { "command": "gitfocal.stashAllChanges", "when": "false" },
+        { "command": "gitfocal.stashStagedChanges", "when": "false" },
+        { "command": "gitfocal.stashUnstagedChanges", "when": "false" },
+        { "command": "gitfocal.renameBranch", "when": "false" },
+        { "command": "gitfocal.hideSubmodules", "when": "false" },
+        { "command": "gitfocal.showSubmodules", "when": "false" }
+      ]
+    },
+    "keybindings": [
+      { "command": "gitfocal.refresh", "key": "ctrl+alt+r", "mac": "cmd+alt+r", "when": "focusedView == gitfocal.branches || focusedView == gitfocal.stashes" },
+      { "command": "gitfocal.fetchAll", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "focusedView == gitfocal.branches" }
+    ],
+    "configuration": {
+      "title": "GitFocal",
+      "properties": {
+        "gitfocal.refreshDebounceMs": {
+          "type": "number",
+          "default": 500,
+          "description": "Debounce delay (ms) for FileSystemWatcher-driven refreshes."
+        },
+        "gitfocal.autoFetchIntervalMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "description": "Periodically run 'git fetch --all --prune' and refresh state. Set to 0 to disable."
+        },
+        "gitfocal.gitPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional explicit path to the git executable. Leave empty to auto-detect."
+        }
+      }
+    }
+  }
+}
