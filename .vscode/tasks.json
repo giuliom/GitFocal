@@ -11,6 +11,13 @@
         "isDefault": true
       },
       "detail": "Package the extension into a VSIX under the build directory"
+    },
+    {
+      "label": "create-package-deno",
+      "type": "shell",
+      "command": "deno run -A npm:@vscode/vsce package -o build --no-dependencies",
+      "problemMatcher": [],
+      "detail": "Package the extension into a VSIX under the build directory using Deno"
     }
   ]
 }
