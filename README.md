@@ -13,9 +13,10 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds two focused view
   - Worktrees are grouped when more than one is present
   - Inline actions: checkout, fetch, pull, push, publish branch
   - Context menu: create from, rename, delete (with force), merge, rebase, squash, reset, change upstream, copy name/upstream/commit hash
-  - Toggle to hide submodule branches
+  - Toggle to hide submodule repositories from the Branches view
 - **Stashes view** in the SCM side bar
   - List, apply, pop, rename, delete stashes
+  - Toggle to hide submodule repositories from the Stashes view
   - Stash all / staged / unstaged changes from the SCM resource menus
 - **Top-level commands**: refresh, create branch, fetch all
 - **Auto-fetch** on a configurable interval (default 5 min)
@@ -82,7 +83,6 @@ src/
 
 ## TODO
 
-- [ ] Ensure cross platform functionality
 - [ ] Better support for worktrees and submodules
 - [ ] Diff viewer integration for stashes
 - [ ] Group local branches by prefix (`feature/`, `fix/`, …)

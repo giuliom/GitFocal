@@ -1,8 +1,10 @@
 'use strict';
 
 const { execFile } = require('child_process');
+const path = require('path');
 const { GitError } = require('./gitTypes');
 const { resolveGitPath } = require('../utils/gitPathResolver');
+const { normalizeFsPath } = require('../utils/pathUtils');
 
 /**
  * Direct git CLI wrapper. Uses only Node.js built-ins (`child_process`).
@@ -49,12 +51,15 @@ class GitService {
 
     async getRepoRoot(repoPath) {
         const out = await this.exec(repoPath, ['rev-parse', '--show-toplevel']);
-        return out.trim();
+        return normalizeFsPath(out.trim());
     }
 
     async getGitDir(repoPath) {
         const out = await this.exec(repoPath, ['rev-parse', '--git-common-dir']);
-        return out.trim();
+        const trimmed = out.trim();
+        // git may return a relative path when run inside the work tree.
+        const absolute = path.isAbsolute(trimmed) ? trimmed : path.resolve(repoPath, trimmed);
+        return normalizeFsPath(absolute);
     }
 
     async getCurrentBranch(repoPath) {

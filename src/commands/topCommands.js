@@ -4,6 +4,9 @@ const vscode = require('vscode');
 const { pickRepo, reportGitError, withProgress } = require('./commandHelpers');
 const preferences = require('../models/preferences');
 
+const CONTEXT_BRANCHES_HIDE_SUBMODULES = 'gitfocal.branches.hideSubmodules';
+const CONTEXT_STASHES_HIDE_SUBMODULES = 'gitfocal.stashes.hideSubmodules';
+
 function registerTopCommands(ctx) {
     const { git, stateManager } = ctx;
 
@@ -106,19 +109,34 @@ function registerTopCommands(ctx) {
             }
         }),
 
-        vscode.commands.registerCommand('gitfocal.toggleHideSubmodules', async () => {
-            const next = await preferences.toggleHideSubmodules();
-            void vscode.commands.executeCommand('setContext', 'gitfocal.hideSubmodules', next);
+        vscode.commands.registerCommand('gitfocal.branches.toggleHideSubmodules', async () => {
+            const next = await preferences.toggleBranchesHideSubmodules();
+            void vscode.commands.executeCommand('setContext', CONTEXT_BRANCHES_HIDE_SUBMODULES, next);
         }),
 
-        vscode.commands.registerCommand('gitfocal.showSubmodules', async () => {
-            await preferences.setHideSubmodules(false);
-            void vscode.commands.executeCommand('setContext', 'gitfocal.hideSubmodules', false);
+        vscode.commands.registerCommand('gitfocal.branches.showSubmodules', async () => {
+            await preferences.setBranchesHideSubmodules(false);
+            void vscode.commands.executeCommand('setContext', CONTEXT_BRANCHES_HIDE_SUBMODULES, false);
         }),
 
-        vscode.commands.registerCommand('gitfocal.hideSubmodules', async () => {
-            await preferences.setHideSubmodules(true);
-            void vscode.commands.executeCommand('setContext', 'gitfocal.hideSubmodules', true);
+        vscode.commands.registerCommand('gitfocal.branches.hideSubmodules', async () => {
+            await preferences.setBranchesHideSubmodules(true);
+            void vscode.commands.executeCommand('setContext', CONTEXT_BRANCHES_HIDE_SUBMODULES, true);
+        }),
+
+        vscode.commands.registerCommand('gitfocal.stashes.toggleHideSubmodules', async () => {
+            const next = await preferences.toggleStashesHideSubmodules();
+            void vscode.commands.executeCommand('setContext', CONTEXT_STASHES_HIDE_SUBMODULES, next);
+        }),
+
+        vscode.commands.registerCommand('gitfocal.stashes.showSubmodules', async () => {
+            await preferences.setStashesHideSubmodules(false);
+            void vscode.commands.executeCommand('setContext', CONTEXT_STASHES_HIDE_SUBMODULES, false);
+        }),
+
+        vscode.commands.registerCommand('gitfocal.stashes.hideSubmodules', async () => {
+            await preferences.setStashesHideSubmodules(true);
+            void vscode.commands.executeCommand('setContext', CONTEXT_STASHES_HIDE_SUBMODULES, true);
         })
     ];
 }

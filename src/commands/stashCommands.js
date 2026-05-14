@@ -9,6 +9,7 @@ const {
     reportGitError,
     withProgress
 } = require('./commandHelpers');
+const { pathsEqual, pathStartsWith } = require('../utils/pathUtils');
 
 function registerStashCommands(ctx) {
     const { git, stateManager } = ctx;
@@ -161,7 +162,7 @@ async function resolveScmRepo(stateManager, arg, others) {
     for (const uri of candidates) {
         const fsPath = uri.fsPath;
         const owner = states
-            .filter(s => fsPath === s.repoPath || fsPath.startsWith(s.repoPath + path.sep))
+            .filter(s => pathsEqual(fsPath, s.repoPath) || pathStartsWith(fsPath, s.repoPath))
             .sort((a, b) => b.repoPath.length - a.repoPath.length)[0];
         if (owner) {
             return owner.repoPath;

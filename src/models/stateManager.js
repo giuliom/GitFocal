@@ -1,9 +1,9 @@
 'use strict';
 
-const path = require('path');
 const vscode = require('vscode');
 const { debounce } = require('../utils/debounce');
 const { createRepositoryState, emptyRepositoryState } = require('./repositoryState');
+const { normalizeFsPath, pathsEqual, pathStartsWith } = require('../utils/pathUtils');
 
 /**
  * Manages per-workspace-folder repository state with FileSystemWatcher-driven refresh.
@@ -77,7 +77,7 @@ class StateManager {
 
     async handleWorkspaceFoldersChanged(e) {
         for (const removed of e.removed) {
-            this.removeFolder(removed.uri.fsPath);
+            this.removeFolder(normalizeFsPath(removed.uri.fsPath));
         }
         for (const added of e.added) {
             await this.addFolder(added);
@@ -85,7 +85,7 @@ class StateManager {
     }
 
     async addFolder(folder) {
-        const folderPath = folder.uri.fsPath;
+        const folderPath = normalizeFsPath(folder.uri.fsPath);
         let repoRoot;
         try {
             if (!(await this.git.isRepository(folderPath))) {
@@ -133,7 +133,7 @@ class StateManager {
 
     removeFolder(folderPath) {
         for (const [root, entry] of this.entries) {
-            if (root === folderPath || root.startsWith(folderPath + path.sep)) {
+            if (pathStartsWith(root, folderPath)) {
                 entry.refreshDebounced.cancel();
                 if (entry.watcher) {
                     entry.watcher.dispose();
@@ -243,8 +243,9 @@ class StateManager {
         if (!fsPath) {
             return undefined;
         }
+        const target = normalizeFsPath(fsPath);
         for (const root of this.entries.keys()) {
-            if (root === fsPath || fsPath.startsWith(root + path.sep) || root.startsWith(fsPath + path.sep)) {
+            if (pathsEqual(root, target) || pathStartsWith(target, root) || pathStartsWith(root, target)) {
                 return root;
             }
         }

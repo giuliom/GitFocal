@@ -3,6 +3,8 @@
 const path = require('path');
 const vscode = require('vscode');
 const { Icons } = require('../ui/icons');
+const preferences = require('../models/preferences');
+const { filterSubmoduleStates } = require('../utils/repoFilters');
 
 class StashesTreeProvider {
     constructor(stateManager, git) {
@@ -13,7 +15,12 @@ class StashesTreeProvider {
         this.disposables = [];
 
         this.disposables.push(
-            this.stateManager.onDidChange(() => this._onDidChangeTreeData.fire())
+            this.stateManager.onDidChange(() => this._onDidChangeTreeData.fire()),
+            preferences.onDidChange(e => {
+                if (e.key === preferences.KEY_STASHES_HIDE_SUBMODULES) {
+                    this._onDidChangeTreeData.fire();
+                }
+            })
         );
     }
 
@@ -61,7 +68,7 @@ class StashesTreeProvider {
     }
 
     getChildren(element) {
-        const states = this.stateManager.getStates();
+        const states = this.getVisibleStates();
         if (!element) {
             if (states.length === 0) {
                 return [];
@@ -86,6 +93,11 @@ class StashesTreeProvider {
             return this.buildStashFiles(element);
         }
         return [];
+    }
+
+    getVisibleStates() {
+        const states = this.stateManager.getStates();
+        return preferences.getStashesHideSubmodules() ? filterSubmoduleStates(states) : states;
     }
 
     buildStashes(state) {

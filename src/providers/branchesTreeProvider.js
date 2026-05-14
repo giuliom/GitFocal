@@ -6,6 +6,7 @@ const { Icons, iconNameForBranch } = require('../ui/icons');
 const { formatBranchDescription, colorForBranch } = require('../ui/decorations');
 const { branchUri } = require('../ui/branchDecorationProvider');
 const preferences = require('../models/preferences');
+const { filterSubmoduleStates, isSameOrDescendantPath } = require('../utils/repoFilters');
 
 const COMMITS_PER_BRANCH = 10;
 
@@ -19,7 +20,11 @@ class BranchesTreeProvider {
 
         this.disposables.push(
             this.stateManager.onDidChange(() => this._onDidChangeTreeData.fire()),
-            preferences.onDidChange(() => this._onDidChangeTreeData.fire())
+            preferences.onDidChange(e => {
+                if (e.key === preferences.KEY_BRANCHES_HIDE_SUBMODULES) {
+                    this._onDidChangeTreeData.fire();
+                }
+            })
         );
     }
 
@@ -115,7 +120,7 @@ class BranchesTreeProvider {
     }
 
     getChildren(element) {
-        const states = this.stateManager.getStates();
+        const states = this.getVisibleStates();
         if (!element) {
             if (states.length === 0) {
                 return [];
@@ -184,6 +189,11 @@ class BranchesTreeProvider {
 
     // --- helpers ---
 
+    getVisibleStates() {
+        const states = this.stateManager.getStates();
+        return preferences.getBranchesHideSubmodules() ? filterSubmoduleStates(states) : states;
+    }
+
     buildRepoChildren(state) {
         const children = this.buildLocalBranches(state);
         if (state.workTrees.length > 1) {
@@ -193,11 +203,11 @@ class BranchesTreeProvider {
     }
 
     buildLocalBranches(state) {
-        const hideSubmodules = preferences.getHideSubmodules();
+        const hideSubmodules = preferences.getBranchesHideSubmodules();
 
         let local = state.branches.filter(b => !b.isRemote);
         if (hideSubmodules) {
-            local = local.filter(b => !b.workTreePath || b.workTreePath.startsWith(state.repoPath));
+            local = local.filter(b => !b.workTreePath || isSameOrDescendantPath(state.repoPath, b.workTreePath));
         }
         return local
             .slice()
