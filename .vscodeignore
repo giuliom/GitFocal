@@ -9,3 +9,4 @@ tsconfig.json
 .vscodeignore
 plan-*.md
 assets/logo.png
+assets/screenshot.png

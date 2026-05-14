@@ -6,6 +6,9 @@
 
 A no-frills Visual Studio Code extension for Git. GitFocal adds three focused views to the Source Control sidebar: **Branches**, **Stashes**, and **Tags**. It shells out to your local `git`, keeps runtime dependencies at zero, and is written in JavaScript.
 
+
+<img src="assets/screenshot.png" alt="GitFocal icon" width="512" />
+
 ## Features
 
 ### Branches view
@@ -28,9 +31,10 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds three focused vi
 
 ### Tags view
 
-- Lists tags per repository with commit/date details and annotated-tag indicator
+- Lists tags per repository with commit/date details, annotated-tag indicator, and origin sync status
 - Create lightweight or annotated tags at `HEAD`, another ref, or directly from a branch commit
-- Checkout, rename, delete, push, and delete remote tags
+- Checkout, rename, delete, and delete remote tags
+- Push tags when they are missing on `origin` or point to a different commit there; matching tags are shown as already synced
 - Copy tag name or tagged commit hash
 
 ### Top-level behavior
