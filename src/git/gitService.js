@@ -232,13 +232,17 @@ class GitService {
         const files = [];
         const lines = out.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         for (const line of lines) {
-            // Format: "<status>\t<path>" e.g. "M\tsrc/foo.js"
-            const tab = line.indexOf('\t');
-            if (tab < 0) {
+            // Format: "<status>\t<path>" or for renames/copies
+            // "R<score>\t<old>\t<new>" / "C<score>\t<old>\t<new>".
+            const parts = line.split('\t');
+            if (parts.length < 2) {
                 continue;
             }
-            const status = line.substring(0, tab).trim();
-            const filePath = line.substring(tab + 1).trim();
+            const status = parts[0].trim();
+            const head = (status || '').charAt(0);
+            const filePath = ((head === 'R' || head === 'C') && parts.length >= 3
+                ? parts[2]
+                : parts[1]).trim();
             if (!filePath) {
                 continue;
             }
@@ -446,9 +450,39 @@ class GitService {
         await this.exec(repoPath, args);
     }
 
+    async getUntrackedPaths(repoPath, paths) {
+        if (!paths || paths.length === 0) {
+            return [];
+        }
+        const out = await this.exec(repoPath, [
+            'ls-files',
+            '--others',
+            '--exclude-standard',
+            '-z',
+            '--',
+            ...paths
+        ]);
+        return out.split('\0').filter(Boolean);
+    }
+
+    async stagePaths(repoPath, paths) {
+        if (!paths || paths.length === 0) {
+            return;
+        }
+        await this.exec(repoPath, ['add', '--', ...paths]);
+    }
+
+    async unstagePaths(repoPath, paths) {
+        if (!paths || paths.length === 0) {
+            return;
+        }
+        await this.exec(repoPath, ['reset', '--', ...paths]);
+    }
+
     async stashPushPaths(repoPath, paths, message, options) {
         const opts = options || {};
         const args = ['stash', 'push'];
+        let stagedUntrackedPaths = [];
         if (opts.staged) {
             args.push('--staged');
         }
@@ -462,12 +496,30 @@ class GitService {
             args.push('-m', message);
         }
         if (paths && paths.length > 0) {
+            // `git stash push -- <path>` rejects untracked paths. Stage only the
+            // selected untracked entries so Git can stash them without widening
+            // the stash scope to every untracked file in the repository.
+            stagedUntrackedPaths = await this.getUntrackedPaths(repoPath, paths);
+            if (stagedUntrackedPaths.length > 0) {
+                await this.stagePaths(repoPath, stagedUntrackedPaths);
+            }
             args.push('--');
             for (const p of paths) {
                 args.push(p);
             }
         }
-        await this.exec(repoPath, args);
+        try {
+            await this.exec(repoPath, args);
+        } catch (err) {
+            if (stagedUntrackedPaths.length > 0) {
+                try {
+                    await this.unstagePaths(repoPath, stagedUntrackedPaths);
+                } catch {
+                    // Best-effort cleanup; preserve the original stash failure.
+                }
+            }
+            throw err;
+        }
     }
 
     async stashAllChanges(repoPath, message) {
@@ -524,23 +576,20 @@ class GitService {
         if (!sha) {
             throw new GitError(`Could not resolve ${id}`, `git rev-parse ${id}`, '');
         }
-        // Capture the original commit subject so we can rollback if `stash store` fails.
-        let originalMessage = '';
+        // Store the renamed entry BEFORE dropping the old one. `git stash store`
+        // pushes a new stash referencing the same commit object; if it fails the
+        // original stash is untouched. If the subsequent drop fails the user
+        // sees a duplicate entry rather than losing the stash.
+        await this.exec(repoPath, ['stash', 'store', '-m', newMessage, sha]);
         try {
-            originalMessage = (await this.exec(repoPath, ['log', '-1', '--format=%s', sha])).trim();
-        } catch {
-            // best-effort; rollback may not be possible
-        }
-        await this.exec(repoPath, ['stash', 'drop', id]);
-        try {
-            await this.exec(repoPath, ['stash', 'store', '-m', newMessage, sha]);
+            await this.exec(repoPath, ['stash', 'drop', id]);
         } catch (err) {
-            if (originalMessage) {
-                try {
-                    await this.exec(repoPath, ['stash', 'store', '-m', originalMessage, sha]);
-                } catch {
-                    // swallow; the SHA remains reachable via reflog/object db
-                }
+            // Best-effort: try to remove the duplicate we just created so we
+            // don't leave the user with two copies of the same stash.
+            try {
+                await this.exec(repoPath, ['stash', 'drop', 'stash@{0}']);
+            } catch {
+                // swallow; the original entry is still present
             }
             throw err;
         }

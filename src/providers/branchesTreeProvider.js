@@ -21,7 +21,10 @@ class BranchesTreeProvider {
         this.disposables = [];
 
         this.disposables.push(
-            this.stateManager.onDidChange(() => this._onDidChangeTreeData.fire()),
+            this.stateManager.onDidChange(() => {
+                this.pruneLoadedCommitCounts();
+                this._onDidChangeTreeData.fire();
+            }),
             preferences.onDidChange(e => {
                 if (e.key === preferences.KEY_BRANCHES_HIDE_SUBMODULES) {
                     this._onDidChangeTreeData.fire();
@@ -297,6 +300,26 @@ class BranchesTreeProvider {
         const current = this.loadedCommitCounts.get(element.branchKey) || INITIAL_COMMITS_PER_BRANCH;
         this.loadedCommitCounts.set(element.branchKey, current + COMMITS_PAGE_SIZE);
         this._onDidChangeTreeData.fire(element.branchElement);
+    }
+
+    pruneLoadedCommitCounts() {
+        if (this.loadedCommitCounts.size === 0) {
+            return;
+        }
+        const live = new Set();
+        for (const state of this.stateManager.getStates()) {
+            for (const b of state.branches) {
+                const ref = b.refName || b.name;
+                if (ref) {
+                    live.add(branchCommitsKey(state.repoPath, ref));
+                }
+            }
+        }
+        for (const key of Array.from(this.loadedCommitCounts.keys())) {
+            if (!live.has(key)) {
+                this.loadedCommitCounts.delete(key);
+            }
+        }
     }
 }
 

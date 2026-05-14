@@ -1,8 +1,8 @@
 {
   "name": "gitfocal",
   "displayName": "GitFocal",
-  "description": "Lightweight Git branches & stashes views for VS Code with zero runtime dependencies.",
-  "version": "0.1.0",
+  "description": "Lightweight Git branches & stashes views for VS Code with zero dependencies.",
+  "version": "0.0.1",
   "publisher": "gitfocal",
   "repository": {
     "type": "git",

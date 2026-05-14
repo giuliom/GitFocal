@@ -6,10 +6,12 @@ const { colorForBranch } = require('./decorations');
 const SCHEME = 'gitfocal-branch';
 
 function branchUri(repoPath, name) {
+    // NOTE: encode into the URI path (not authority) because VS Code lowercases
+    // the authority component, which would corrupt repo paths containing
+    // uppercase characters and break the lookup in `provideFileDecoration`.
     return vscode.Uri.from({
         scheme: SCHEME,
-        authority: encodeURIComponent(repoPath),
-        path: '/' + encodeURIComponent(name)
+        path: '/' + encodeURIComponent(repoPath) + '/' + encodeURIComponent(name)
     });
 }
 
@@ -28,8 +30,13 @@ class BranchDecorationProvider {
         let repoPath;
         let branchName;
         try {
-            repoPath = decodeURIComponent(uri.authority);
-            branchName = decodeURIComponent(uri.path.replace(/^\//, ''));
+            const raw = uri.path.replace(/^\//, '');
+            const slash = raw.indexOf('/');
+            if (slash < 0) {
+                return undefined;
+            }
+            repoPath = decodeURIComponent(raw.substring(0, slash));
+            branchName = decodeURIComponent(raw.substring(slash + 1));
         } catch {
             return undefined;
         }

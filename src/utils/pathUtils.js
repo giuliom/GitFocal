@@ -3,6 +3,11 @@
 const path = require('path');
 
 const isWindows = process.platform === 'win32';
+// macOS volumes are case-insensitive by default (APFS / HFS+). Treat darwin
+// the same as Windows for path comparisons so that paths returned by git and
+// paths produced by VS Code with different casing still resolve to the same
+// repository entry.
+const isCaseInsensitiveFs = isWindows || process.platform === 'darwin';
 
 /**
  * Normalize a filesystem path to the platform's canonical form so that paths
@@ -42,12 +47,12 @@ function pathsEqual(a, b) {
     }
     const na = normalizeFsPath(a);
     const nb = normalizeFsPath(b);
-    return isWindows ? na.toLowerCase() === nb.toLowerCase() : na === nb;
+    return isCaseInsensitiveFs ? na.toLowerCase() === nb.toLowerCase() : na === nb;
 }
 
 /**
  * Returns true when `child` is equal to or contained within `parent`.
- * Case-insensitive on Windows.
+ * Case-insensitive on Windows and macOS.
  */
 function pathStartsWith(child, parent) {
     if (!child || !parent) {
@@ -55,8 +60,8 @@ function pathStartsWith(child, parent) {
     }
     const nc = normalizeFsPath(child);
     const np = normalizeFsPath(parent);
-    const a = isWindows ? nc.toLowerCase() : nc;
-    const b = isWindows ? np.toLowerCase() : np;
+    const a = isCaseInsensitiveFs ? nc.toLowerCase() : nc;
+    const b = isCaseInsensitiveFs ? np.toLowerCase() : np;
     if (a === b) {
         return true;
     }

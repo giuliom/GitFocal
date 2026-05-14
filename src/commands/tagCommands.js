@@ -11,6 +11,19 @@ function isCommitNode(arg) {
     return !!arg && typeof arg === 'object' && arg.kind === 'commit';
 }
 
+function isTagAlreadyExistsError(err) {
+    const detail = err instanceof Error ? err.message : (err ? String(err) : '');
+    return /tag '.*' already exists/i.test(detail);
+}
+
+function getOverwriteTagPrompt(name, ref, existingTag) {
+    const currentTarget = existingTag && (existingTag.commitHash || existingTag.commitHashFull)
+        ? ` at ${existingTag.commitHash || existingTag.commitHashFull}`
+        : '';
+    const replacementTarget = ref ? ` at ${ref}` : ' at HEAD';
+    return `Tag '${name}' already exists${currentTarget}. Overwrite it${replacementTarget}?`;
+}
+
 async function resolveTagNode(stateManager, arg) {
     if (isTagNode(arg) && arg.tag) {
         const state = stateManager.getState(arg.repoPath);
@@ -69,12 +82,37 @@ async function promptCreateTag(git, stateManager, repo, ref, defaultName) {
             return false;
         }
     }
+    const existingTag = (repo.tags || []).find(tag => tag.name === trimmed);
+    let force = false;
+    if (existingTag) {
+        force = await confirm(getOverwriteTagPrompt(trimmed, ref, existingTag), 'Overwrite');
+        if (!force) {
+            return false;
+        }
+    }
+    const runCreateTag = () => withProgress(
+        `${force ? 'Overwrite' : 'Create'} tag ${trimmed}`,
+        () => git.createTag(repo.repoPath, trimmed, { ref, message, force })
+    );
     try {
-        await withProgress(`Create tag ${trimmed}`, () =>
-            git.createTag(repo.repoPath, trimmed, { ref, message }));
+        await runCreateTag();
         await stateManager.refresh(repo.repoPath);
         return true;
     } catch (err) {
+        if (!force && isTagAlreadyExistsError(err)) {
+            force = await confirm(getOverwriteTagPrompt(trimmed, ref, existingTag), 'Overwrite');
+            if (!force) {
+                return false;
+            }
+            try {
+                await runCreateTag();
+                await stateManager.refresh(repo.repoPath);
+                return true;
+            } catch (forceErr) {
+                reportGitError(forceErr, `Failed to overwrite tag ${trimmed}`);
+                return false;
+            }
+        }
         reportGitError(err, `Failed to create tag ${trimmed}`);
         return false;
     }

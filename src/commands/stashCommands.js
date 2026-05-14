@@ -190,28 +190,32 @@ async function runScmStashSelected(ctx, arg, others) {
 function collectSelectedResources(arg, others) {
     const list = [];
     const push = (uri) => { if (uri) list.push(uri); };
-    if (arg && Array.isArray(arg.resourceStates)) {
-        for (const r of arg.resourceStates) {
-            if (r && r.resourceUri) push(r.resourceUri);
+    const visit = (item) => {
+        if (!item) {
+            return;
         }
-    } else if (arg && arg.resourceUri) {
-        push(arg.resourceUri);
-    } else if (arg instanceof vscode.Uri) {
-        push(arg);
-    }
-    if (Array.isArray(others)) {
-        for (const o of others) {
-            if (o && Array.isArray(o.resourceStates)) {
-                for (const r of o.resourceStates) {
-                    if (r && r.resourceUri) push(r.resourceUri);
-                }
-            } else if (o && o.resourceUri) {
-                push(o.resourceUri);
-            } else if (o instanceof vscode.Uri) {
-                push(o);
+        if (Array.isArray(item)) {
+            for (const inner of item) {
+                visit(inner);
             }
+            return;
         }
-    }
+        if (item instanceof vscode.Uri) {
+            push(item);
+            return;
+        }
+        if (Array.isArray(item.resourceStates)) {
+            for (const r of item.resourceStates) {
+                visit(r);
+            }
+            return;
+        }
+        if (item.resourceUri) {
+            push(item.resourceUri);
+        }
+    };
+    visit(arg);
+    visit(others);
     return list;
 }
 
