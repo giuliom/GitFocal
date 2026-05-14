@@ -114,13 +114,20 @@ function registerBranchCommands(ctx) {
         }),
 
         vscode.commands.registerCommand('gitfocal.pushSetUpstream', async (arg) => {
-            const repo = await pickRepo(stateManager, isBranchNode(arg) ? arg.repoPath : undefined);
-            if (!repo) {
+            // Resolve the clicked branch — Publish Branch must publish the
+            // branch the user invoked the command on, not whatever happens to
+            // be checked out.
+            const resolved = await resolveBranchNode(stateManager, arg, {
+                localOnly: true,
+                placeHolder: 'Publish branch'
+            });
+            if (!resolved) {
                 return;
             }
             try {
-                await withProgress('Push (set upstream)', () => git.push(repo.repoPath, true));
-                await stateManager.refresh(repo.repoPath);
+                await withProgress(`Publish ${resolved.branchName}`,
+                    () => git.push(resolved.state.repoPath, true, resolved.branchName));
+                await stateManager.refresh(resolved.state.repoPath);
             } catch (err) {
                 reportGitError(err, 'Push failed');
             }
@@ -272,16 +279,13 @@ function registerBranchCommands(ctx) {
                 return;
             }
             await vscode.env.clipboard.writeText(arg.branch.name);
-            void vscode.window.showInformationMessage(`Copied: ${arg.branch.name}`);
         }),
 
         vscode.commands.registerCommand('gitfocal.copyUpstream', async (arg) => {
             if (!isBranchNode(arg) || !arg.branch || !arg.branch.upstream) {
-                void vscode.window.showInformationMessage('No upstream set for this branch.');
                 return;
             }
             await vscode.env.clipboard.writeText(arg.branch.upstream);
-            void vscode.window.showInformationMessage(`Copied: ${arg.branch.upstream}`);
         }),
 
         vscode.commands.registerCommand('gitfocal.copyCommitHash', async (arg) => {
@@ -289,7 +293,6 @@ function registerBranchCommands(ctx) {
                 return;
             }
             await vscode.env.clipboard.writeText(arg.branch.commitHashFull);
-            void vscode.window.showInformationMessage(`Copied: ${arg.branch.commitHashFull}`);
         }),
 
         vscode.commands.registerCommand('gitfocal.copyCommit', async (arg) => {
@@ -297,7 +300,6 @@ function registerBranchCommands(ctx) {
                 return;
             }
             await vscode.env.clipboard.writeText(arg.commit.hash);
-            void vscode.window.showInformationMessage(`Copied: ${arg.commit.hash}`);
         }),
 
         vscode.commands.registerCommand('gitfocal.cherryPickCommit', async (arg) => {

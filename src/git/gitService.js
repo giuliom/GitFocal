@@ -348,10 +348,10 @@ class GitService {
         await this.exec(repoPath, ['pull', '--ff-only']);
     }
 
-    async push(repoPath, setUpstream) {
+    async push(repoPath, setUpstream, branchName) {
         const args = ['push'];
         if (setUpstream) {
-            const branch = await this.getCurrentBranch(repoPath);
+            const branch = branchName || await this.getCurrentBranch(repoPath);
             args.push('-u', 'origin', branch);
         }
         await this.exec(repoPath, args);
