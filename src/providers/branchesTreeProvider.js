@@ -89,7 +89,7 @@ class BranchesTreeProvider {
                 item.description = formatBranchDescription(branch);
                 item.tooltip = buildBranchTooltip(branch);
                 item.resourceUri = branchUri(element.repoPath, branch.name);
-                const trackingSuffix = branch.isRemote ? '' : (branch.isTracking ? '.tracking' : '.untracked');
+                const trackingSuffix = branch.isRemote ? '' : (branch.isTracking && !branch.upstreamGone ? '.tracking' : '.untracked');
                 if (branch.isRemote) {
                     item.contextValue = 'branch.remote';
                 } else if (branch.isCurrent) {
@@ -380,7 +380,11 @@ function buildBranchTooltip(branch) {
     }
     if (branch.upstream) {
         md.appendMarkdown(`- upstream: \`${branch.upstream}\`\n`);
-        md.appendMarkdown(`- ahead/behind: ${branch.aheadBehind.ahead}/${branch.aheadBehind.behind}\n`);
+        if (branch.upstreamGone) {
+            md.appendMarkdown(`- upstream: deleted on remote\n`);
+        } else {
+            md.appendMarkdown(`- ahead/behind: ${branch.aheadBehind.ahead}/${branch.aheadBehind.behind}\n`);
+        }
     }
     if (branch.workTreePath) {
         md.appendMarkdown(`- worktree: \`${branch.workTreePath}\`\n`);

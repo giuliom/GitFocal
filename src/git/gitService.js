@@ -129,6 +129,7 @@ class GitService {
                 isCurrent,
                 isTracking: !!upstream,
                 upstream,
+                upstreamGone: !!upstream && track.includes('[gone]'),
                 aheadBehind: parseAheadBehind(track),
                 commitHash,
                 commitHashFull,

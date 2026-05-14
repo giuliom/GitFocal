@@ -1,6 +1,8 @@
 # GitFocal
 
 [![Package VSIX](https://github.com/giuliom/GitFocal/actions/workflows/package.yml/badge.svg)](https://github.com/giuliom/GitFocal/actions/workflows/package.yml)
+[![CodeQL Advanced](https://github.com/giuliom/GitFocal/actions/workflows/codeql.yml/badge.svg)](https://github.com/giuliom/GitFocal/actions/workflows/codeql.yml)
+
 
 <img src="assets/icon.png" alt="GitFocal icon" width="128" />
 

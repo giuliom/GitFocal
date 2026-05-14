@@ -24,6 +24,18 @@
   "main": "./src/extension.js",
   "icon": "assets/icon.png",
   "contributes": {
+    "colors": [
+      {
+        "id": "gitfocal.upstreamGoneForeground",
+        "description": "Color for branches whose upstream has been deleted on the remote.",
+        "defaults": {
+          "dark": "#c97878",
+          "light": "#a84040",
+          "highContrast": "#ff8080",
+          "highContrastLight": "#a84040"
+        }
+      }
+    ],
     "viewsContainers": {},
     "views": {
       "scm": [
