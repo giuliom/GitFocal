@@ -4,23 +4,40 @@
 
 <img src="assets/icon.png" alt="GitFocal icon" width="128" />
 
-A no-frills Visual Studio Code extension for Git. GitFocal adds two focused views to the Source Control side bar: **Branches** and **Stashes** with zero dependencies (it shells out to your local `git` and is built in Javascript instead of Typescript for the same reason).
+A no-frills Visual Studio Code extension for Git. GitFocal adds three focused views to the Source Control sidebar: **Branches**, **Stashes**, and **Tags**. It shells out to your local `git`, keeps runtime dependencies at zero, and is written in JavaScript.
 
 ## Features
 
-- **Branches view** in the SCM side bar
-  - Lists local branches with current-branch indicator, ahead/behind counts, and upstream info
-  - Worktrees are grouped when more than one is present
-  - Inline actions: checkout, fetch, pull, push, publish branch
-  - Context menu: create from, rename, delete (with force), merge, rebase, squash, reset, change upstream, copy name/upstream/commit hash
-  - Toggle to hide submodule repositories from the Branches view
-- **Stashes view** in the SCM side bar
-  - List, apply, pop, rename, delete stashes
-  - Toggle to hide submodule repositories from the Stashes view
-  - Stash all / staged / unstaged changes from the SCM resource menus
-- **Top-level commands**: refresh, create branch, fetch all
-- **Auto-fetch** on a configurable interval (default 5 min)
-- **Auto-detects** `git` or accepts an explicit path via `gitfocal.gitPath`
+### Branches view
+
+- Lists local branches with current-branch indicator, ahead/behind counts, and upstream info
+- Worktrees are grouped when more than one is present
+- Expanding a branch shows recent commits
+- Inline actions: checkout, fetch, pull, push, publish branch, reset current branch
+- Context menu: create from, rename, delete (with force), merge, rebase, squash, reset, change upstream, copy branch name/upstream/commit hash
+- Commit actions: cherry-pick, create tag at commit, copy commit hash
+- Toggle to hide submodule repositories from the Branches view
+
+### Stashes view
+
+- Lists stashes per repository and expands each stash to show changed files
+- Apply, pop, rename, and delete stashes
+- Restore an individual file from a stash
+- Stash changes from the view title or stash all / staged / unstaged changes from SCM resource menus
+- Toggle to hide submodule repositories from the Stashes view
+
+### Tags view
+
+- Lists tags per repository with commit/date details and annotated-tag indicator
+- Create lightweight or annotated tags at `HEAD`, another ref, or directly from a branch commit
+- Checkout, rename, delete, push, and delete remote tags
+- Copy tag name or tagged commit hash
+
+### Top-level behavior
+
+- View title commands for refresh, create branch, stash changes, create tag, and fetch all repositories
+- Auto-fetch on a configurable interval (default 5 min)
+- Auto-detects `git` or accepts an explicit path via `gitfocal.gitPath`
 
 ## Configuration
 
@@ -34,17 +51,17 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds two focused view
 
 | Command | Shortcut |
 | --- | --- |
-| Refresh | `Ctrl+Alt+R` / `Cmd+Alt+R` (when a GitFocal view is focused) |
-| Fetch All | `Ctrl+Alt+F` / `Cmd+Alt+F` (when Branches is focused) |
+| Refresh focused GitFocal view | `Ctrl+Alt+R` / `Cmd+Alt+R` |
+| Fetch all repositories from Branches view | `Ctrl+Alt+F` / `Cmd+Alt+F` |
 
 ## Building the VSIX
 
-GitFocal has no build step — the extension runs directly from `src/`. Packaging is done with [`@vscode/vsce`](https://github.com/microsoft/vscode-vsce) via `npx`.
+GitFocal has no transpile step. The extension runs directly from `src/`, and packaging is done with [`@vscode/vsce`](https://github.com/microsoft/vscode-vsce).
 
 ### Prerequisites
 
 - `git` on `PATH`
-- [Node.js](https://nodejs.org/) 18+ (for `npx`, only needed to create a package locally)
+- [Node.js](https://nodejs.org/) 18+ for `npx`, or [Deno](https://deno.com/) for the alternate packaging command
 
 ### Package
 
@@ -52,11 +69,18 @@ GitFocal has no build step — the extension runs directly from `src/`. Packagin
 npx @vscode/vsce package -o build
 ```
 
+Alternative with Deno:
+
+```sh
+deno run -A npm:@vscode/vsce package -o build --no-dependencies
+```
+
 The resulting `gitfocal-<version>.vsix` is written to the `build/` directory.
 
-You can also run the bundled VS Code task:
+You can also run the bundled VS Code tasks:
 
 - **Terminal → Run Task… → create-package**
+- **Terminal → Run Task… → create-package-deno**
 
 ### Install the VSIX locally
 

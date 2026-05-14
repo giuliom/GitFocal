@@ -8,7 +8,8 @@ const { branchUri } = require('../ui/branchDecorationProvider');
 const preferences = require('../models/preferences');
 const { filterSubmoduleStates, isSameOrDescendantPath } = require('../utils/repoFilters');
 
-const COMMITS_PER_BRANCH = 10;
+const INITIAL_COMMITS_PER_BRANCH = 5;
+const COMMITS_PAGE_SIZE = 5;
 
 class BranchesTreeProvider {
     constructor(stateManager, git) {
@@ -16,6 +17,7 @@ class BranchesTreeProvider {
         this.git = git;
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+        this.loadedCommitCounts = new Map();
         this.disposables = [];
 
         this.disposables.push(
@@ -112,6 +114,13 @@ class BranchesTreeProvider {
                 const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
                 item.iconPath = new vscode.ThemeIcon('ellipsis');
                 item.contextValue = 'commitMore';
+                if (element.branchElement) {
+                    item.command = {
+                        command: 'gitfocal.loadMoreCommits',
+                        title: 'Load More Commits',
+                        arguments: [element]
+                    };
+                }
                 return item;
             }
             default:
@@ -248,15 +257,30 @@ class BranchesTreeProvider {
         if (!ref) {
             return [];
         }
+        const key = branchCommitsKey(element.repoPath, ref);
+        const desired = this.loadedCommitCounts.get(key) || INITIAL_COMMITS_PER_BRANCH;
         try {
-            const commits = await this.git.getBranchCommits(element.repoPath, ref, COMMITS_PER_BRANCH);
-            return commits.map(c => ({
+            // Request one extra to detect whether more commits are available.
+            const commits = await this.git.getBranchCommits(element.repoPath, ref, desired + 1);
+            const hasMore = commits.length > desired;
+            const visible = hasMore ? commits.slice(0, desired) : commits;
+            const items = visible.map(c => ({
                 kind: 'commit',
                 label: c.subject || c.shortHash,
                 repoPath: element.repoPath,
                 branch,
                 commit: c
             }));
+            if (hasMore) {
+                items.push({
+                    kind: 'commitMore',
+                    label: `Load more`,
+                    repoPath: element.repoPath,
+                    branchElement: element,
+                    branchKey: key
+                });
+            }
+            return items;
         } catch {
             return [{
                 kind: 'commitMore',
@@ -265,6 +289,19 @@ class BranchesTreeProvider {
             }];
         }
     }
+
+    loadMoreCommits(element) {
+        if (!element || !element.branchKey || !element.branchElement) {
+            return;
+        }
+        const current = this.loadedCommitCounts.get(element.branchKey) || INITIAL_COMMITS_PER_BRANCH;
+        this.loadedCommitCounts.set(element.branchKey, current + COMMITS_PAGE_SIZE);
+        this._onDidChangeTreeData.fire(element.branchElement);
+    }
+}
+
+function branchCommitsKey(repoPath, refName) {
+    return `${repoPath}\x1f${refName}`;
 }
 
 function buildCommitTooltip(commit) {

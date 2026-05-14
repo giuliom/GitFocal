@@ -47,12 +47,16 @@ class TagsTreeProvider {
         if (tag.commitHash) {
             parts.push(tag.commitHash);
         }
+        const originStatus = formatOriginStatus(tag);
+        if (originStatus) {
+            parts.push(originStatus);
+        }
         if (tag.taggerDate) {
             parts.push(tag.taggerDate);
         }
         item.description = parts.join(' \u2022 ');
         item.tooltip = buildTagTooltip(tag);
-        item.contextValue = 'tag';
+        item.contextValue = tag.canPushTag ? 'tag.pushable' : 'tag.synced';
         return item;
     }
 
@@ -101,6 +105,13 @@ function buildTagTooltip(tag) {
     if (tag.commitHashFull) {
         md.appendMarkdown(`- commit: \`${tag.commitHashFull}\`\n`);
     }
+    const originStatus = formatOriginStatus(tag);
+    if (originStatus) {
+        md.appendMarkdown(`- origin: ${originStatus}\n`);
+    }
+    if (tag.originStatus === 'different' && tag.originCommitHashFull) {
+        md.appendMarkdown(`- origin commit: \`${tag.originCommitHashFull}\`\n`);
+    }
     if (tag.subject) {
         md.appendMarkdown(`- subject: ${tag.subject}\n`);
     }
@@ -111,6 +122,27 @@ function buildTagTooltip(tag) {
         md.appendMarkdown(`- date: ${tag.taggerDate}\n`);
     }
     return md;
+}
+
+function formatOriginStatus(tag) {
+    switch (tag.originStatus) {
+        case 'same':
+            return 'same commit on origin';
+        case 'different':
+            return tag.originCommitHash
+                ? `different commit on origin (${tag.originCommitHash})`
+                : 'different commit on origin';
+        case 'missing':
+            return 'not on origin';
+        case 'no-origin':
+            return 'no origin remote';
+        case 'no-remote':
+            return 'no remotes';
+        case 'unavailable':
+            return 'origin unavailable';
+        default:
+            return '';
+    }
 }
 
 module.exports = { TagsTreeProvider };

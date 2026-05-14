@@ -6,10 +6,16 @@ const { GitError } = require('./gitTypes');
 const { resolveGitPath } = require('../utils/gitPathResolver');
 const { normalizeFsPath } = require('../utils/pathUtils');
 
+const REMOTE_TAG_CACHE_TTL_MS = 30 * 1000;
+
 /**
  * Direct git CLI wrapper. Uses only Node.js built-ins (`child_process`).
  */
 class GitService {
+    constructor() {
+        this.remoteTagCache = new Map();
+    }
+
     /** Execute a git command and return stdout. Throws GitError on failure. */
     async exec(repoPath, args, opts) {
         const options = opts || {};
@@ -288,15 +294,15 @@ class GitService {
     // --- Branch operations ---
 
     async checkoutBranch(repoPath, branch) {
-        await this.exec(repoPath, ['checkout', branch]);
+        await this.exec(repoPath, ['checkout', '--end-of-options', branch]);
     }
 
     async checkoutRemoteAsLocal(repoPath, remoteBranch, localName) {
-        await this.exec(repoPath, ['checkout', '-b', localName, '--track', remoteBranch]);
+        await this.exec(repoPath, ['checkout', '-b', localName, '--track', '--end-of-options', remoteBranch]);
     }
 
     async createBranch(repoPath, name, from) {
-        const args = ['branch', name];
+        const args = ['branch', '--end-of-options', name];
         if (from) {
             args.push(from);
         }
@@ -304,23 +310,23 @@ class GitService {
     }
 
     async deleteBranch(repoPath, branch, force) {
-        await this.exec(repoPath, ['branch', force ? '-D' : '-d', branch]);
+        await this.exec(repoPath, ['branch', force ? '-D' : '-d', '--end-of-options', branch]);
     }
 
     async deleteRemoteBranch(repoPath, remote, branch) {
-        await this.exec(repoPath, ['push', remote, '--delete', branch]);
+        await this.exec(repoPath, ['push', '--delete', '--end-of-options', remote, branch]);
     }
 
     async mergeBranch(repoPath, branch) {
-        await this.exec(repoPath, ['merge', branch]);
+        await this.exec(repoPath, ['merge', '--end-of-options', branch]);
     }
 
     async rebaseBranch(repoPath, onto) {
-        await this.exec(repoPath, ['rebase', onto]);
+        await this.exec(repoPath, ['rebase', '--end-of-options', onto]);
     }
 
     async cherryPick(repoPath, hash) {
-        await this.exec(repoPath, ['cherry-pick', hash]);
+        await this.exec(repoPath, ['cherry-pick', '--end-of-options', hash]);
     }
 
     async fetchRemote(repoPath, remote) {
@@ -359,16 +365,72 @@ class GitService {
     }
 
     async resetBranch(repoPath, target, mode) {
-        await this.exec(repoPath, ['reset', `--${mode}`, target]);
+        await this.exec(repoPath, ['reset', `--${mode}`, '--end-of-options', target]);
     }
 
     async setUpstream(repoPath, branch, upstream) {
-        await this.exec(repoPath, ['branch', `--set-upstream-to=${upstream}`, branch]);
+        await this.exec(repoPath, ['branch', `--set-upstream-to=${upstream}`, '--end-of-options', branch]);
     }
 
     async listRemotes(repoPath) {
         const out = await this.exec(repoPath, ['remote']);
         return out.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    }
+
+    async getRemoteTags(repoPath, remote) {
+        const normalizedRepoPath = normalizeFsPath(repoPath);
+        const cacheKey = `${normalizedRepoPath}::${remote}`;
+        const cached = this.remoteTagCache.get(cacheKey);
+        if (cached && (Date.now() - cached.fetchedAt) < REMOTE_TAG_CACHE_TTL_MS) {
+            return cached.tags;
+        }
+
+        const out = await this.exec(repoPath, ['ls-remote', '--tags', remote]);
+        const tags = new Map();
+        const lines = out.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+
+        for (const line of lines) {
+            const [sha, refName] = line.split(/\s+/);
+            if (!sha || !refName || !refName.startsWith('refs/tags/')) {
+                continue;
+            }
+            const isPeeled = refName.endsWith('^{}');
+            const tagName = isPeeled
+                ? refName.substring('refs/tags/'.length, refName.length - 3)
+                : refName.substring('refs/tags/'.length);
+            const current = tags.get(tagName) || {};
+            if (isPeeled) {
+                current.commitHashFull = sha;
+            } else {
+                current.objectHashFull = sha;
+            }
+            tags.set(tagName, current);
+        }
+
+        for (const entry of tags.values()) {
+            if (!entry.commitHashFull) {
+                entry.commitHashFull = entry.objectHashFull || '';
+            }
+        }
+
+        this.remoteTagCache.set(cacheKey, {
+            fetchedAt: Date.now(),
+            tags
+        });
+        return tags;
+    }
+
+    invalidateRemoteTagCache(repoPath, remote) {
+        const normalizedRepoPath = normalizeFsPath(repoPath);
+        if (remote) {
+            this.remoteTagCache.delete(`${normalizedRepoPath}::${remote}`);
+            return;
+        }
+        for (const key of this.remoteTagCache.keys()) {
+            if (key.startsWith(`${normalizedRepoPath}::`)) {
+                this.remoteTagCache.delete(key);
+            }
+        }
     }
 
     // --- Stash operations ---
@@ -425,22 +487,16 @@ class GitService {
     }
 
     async stashUnstagedChanges(repoPath, message) {
-        const unstagedOut = await this.exec(repoPath, ['diff', '--name-only'], { allowFailure: true });
-        const untrackedOut = await this.exec(repoPath, ['ls-files', '--others', '--exclude-standard'], { allowFailure: true });
-        const paths = [
-            ...unstagedOut.split(/\r?\n/).map(s => s.trim()).filter(Boolean),
-            ...untrackedOut.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
-        ];
-        if (paths.length === 0) {
-            throw new GitError('No unstaged changes to stash', 'git stash unstaged', '');
-        }
-        const args = ['stash', 'push', '-u'];
+        // Use `--keep-index`: stash all changes (staged + unstaged) but reset the
+        // working tree to match the index afterwards. The net effect is that only
+        // the unstaged work is removed from the working tree, while staged hunks
+        // remain intact in the index. This is the standard git idiom for "stash
+        // only the unstaged changes" and correctly handles files that have both
+        // staged and unstaged hunks (which a path-based `git stash push -- <path>`
+        // would silently stash in full, dropping the user's staged work).
+        const args = ['stash', 'push', '--keep-index'];
         if (message) {
             args.push('-m', message);
-        }
-        args.push('--');
-        for (const p of paths) {
-            args.push(p);
         }
         await this.exec(repoPath, args);
     }
@@ -491,7 +547,7 @@ class GitService {
     }
 
     async renameBranch(repoPath, oldName, newName) {
-        await this.exec(repoPath, ['branch', '-m', oldName, newName]);
+        await this.exec(repoPath, ['branch', '-m', '--end-of-options', oldName, newName]);
     }
 
     // --- Tag operations ---
@@ -549,7 +605,57 @@ class GitService {
                 subject: isAnnotated ? (f[8] || undefined) : (f[11] || undefined)
             });
         }
-        return tags;
+
+        const remotes = await this.listRemotes(repoPath).catch(() => []);
+        if (remotes.length === 0) {
+            return tags.map(tag => ({
+                ...tag,
+                originStatus: 'no-remote',
+                canPushTag: false
+            }));
+        }
+
+        if (!remotes.includes('origin')) {
+            return tags.map(tag => ({
+                ...tag,
+                originStatus: 'no-origin',
+                canPushTag: true
+            }));
+        }
+
+        let remoteTags;
+        try {
+            remoteTags = await this.getRemoteTags(repoPath, 'origin');
+        } catch {
+            return tags.map(tag => ({
+                ...tag,
+                originStatus: 'unavailable',
+                canPushTag: true
+            }));
+        }
+
+        return tags.map(tag => {
+            const remoteTag = remoteTags.get(tag.name);
+            if (!remoteTag) {
+                return {
+                    ...tag,
+                    originStatus: 'missing',
+                    canPushTag: true
+                };
+            }
+
+            const localCommitHashFull = tag.commitHashFull || tag.commitHash || '';
+            const originCommitHashFull = remoteTag.commitHashFull || remoteTag.objectHashFull || '';
+            const sameCommit = !!localCommitHashFull && !!originCommitHashFull && localCommitHashFull === originCommitHashFull;
+
+            return {
+                ...tag,
+                originStatus: sameCommit ? 'same' : 'different',
+                originCommitHashFull: originCommitHashFull || undefined,
+                originCommitHash: originCommitHashFull ? originCommitHashFull.substring(0, 7) : undefined,
+                canPushTag: !sameCommit
+            };
+        });
     }
 
     async createTag(repoPath, name, options) {
@@ -570,7 +676,7 @@ class GitService {
     }
 
     async deleteTag(repoPath, name) {
-        await this.exec(repoPath, ['tag', '-d', name]);
+        await this.exec(repoPath, ['tag', '-d', '--end-of-options', name]);
     }
 
     async renameTag(repoPath, oldName, newName) {
@@ -580,13 +686,21 @@ class GitService {
         await this.exec(repoPath, ['update-ref', '-d', `refs/tags/${oldName}`]);
     }
 
-    async pushTag(repoPath, name, remote) {
+    async pushTag(repoPath, name, remote, options) {
+        const opts = options || {};
         const r = remote || 'origin';
-        await this.exec(repoPath, ['push', r, `refs/tags/${name}`]);
+        const args = ['push'];
+        if (opts.force) {
+            args.push('--force');
+        }
+        args.push(r, `refs/tags/${name}`);
+        await this.exec(repoPath, args);
+        this.invalidateRemoteTagCache(repoPath, r);
     }
 
     async deleteRemoteTag(repoPath, remote, name) {
         await this.exec(repoPath, ['push', remote, '--delete', `refs/tags/${name}`]);
+        this.invalidateRemoteTagCache(repoPath, remote);
     }
 }
 

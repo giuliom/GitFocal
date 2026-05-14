@@ -113,6 +113,10 @@ function registerStashCommands(ctx) {
 
         vscode.commands.registerCommand('gitfocal.stashUnstagedChanges', async (arg, others) => {
             await runScmStash(ctx, arg, others, 'unstaged');
+        }),
+
+        vscode.commands.registerCommand('gitfocal.stashSelectedChanges', async (arg, others) => {
+            await runScmStashSelected(ctx, arg, others);
         })
     ];
 }
@@ -141,6 +145,74 @@ async function runScmStash(ctx, arg, others, mode) {
     } catch (err) {
         reportGitError(err, 'Stash failed');
     }
+}
+
+async function runScmStashSelected(ctx, arg, others) {
+    const { git, stateManager } = ctx;
+    const repoPath = await resolveScmRepo(stateManager, arg, others);
+    if (!repoPath) {
+        void vscode.window.showWarningMessage('GitFocal: could not determine repository.');
+        return;
+    }
+    const uris = collectSelectedResources(arg, others);
+    const paths = [];
+    const seen = new Set();
+    for (const uri of uris) {
+        const fsPath = uri.fsPath;
+        if (!pathsEqual(fsPath, repoPath) && !pathStartsWith(fsPath, repoPath)) {
+            continue;
+        }
+        const rel = path.relative(repoPath, fsPath);
+        if (!rel || seen.has(rel)) {
+            continue;
+        }
+        seen.add(rel);
+        paths.push(rel);
+    }
+    if (paths.length === 0) {
+        void vscode.window.showWarningMessage('GitFocal: no files selected to stash.');
+        return;
+    }
+    const message = await vscode.window.showInputBox({ prompt: 'Stash message (optional)' });
+    if (message === undefined) {
+        return;
+    }
+    const msg = message || undefined;
+    try {
+        const label = paths.length === 1 ? `Stash ${paths[0]}` : `Stash ${paths.length} selected files`;
+        await withProgress(label, () => git.stashPushPaths(repoPath, paths, msg));
+        await stateManager.refresh(repoPath);
+    } catch (err) {
+        reportGitError(err, 'Stash failed');
+    }
+}
+
+function collectSelectedResources(arg, others) {
+    const list = [];
+    const push = (uri) => { if (uri) list.push(uri); };
+    if (arg && Array.isArray(arg.resourceStates)) {
+        for (const r of arg.resourceStates) {
+            if (r && r.resourceUri) push(r.resourceUri);
+        }
+    } else if (arg && arg.resourceUri) {
+        push(arg.resourceUri);
+    } else if (arg instanceof vscode.Uri) {
+        push(arg);
+    }
+    if (Array.isArray(others)) {
+        for (const o of others) {
+            if (o && Array.isArray(o.resourceStates)) {
+                for (const r of o.resourceStates) {
+                    if (r && r.resourceUri) push(r.resourceUri);
+                }
+            } else if (o && o.resourceUri) {
+                push(o.resourceUri);
+            } else if (o instanceof vscode.Uri) {
+                push(o);
+            }
+        }
+    }
+    return list;
 }
 
 async function resolveScmRepo(stateManager, arg, others) {

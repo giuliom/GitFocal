@@ -97,8 +97,12 @@ class StateManager {
         }
 
         // Entries are keyed by repo root so that multiple workspace folders inside the
-        // same repository collapse to a single entry.
-        if (this.entries.has(repoRoot)) {
+        // same repository collapse to a single entry. Track each contributing folder
+        // so that removing one folder does not unregister the entry while another
+        // still maps to it.
+        const existing = this.entries.get(repoRoot);
+        if (existing) {
+            existing.folderPaths.add(folderPath);
             return;
         }
 
@@ -109,7 +113,8 @@ class StateManager {
 
         const entry = {
             state: emptyRepositoryState(repoRoot),
-            refreshDebounced
+            refreshDebounced,
+            folderPaths: new Set([folderPath])
         };
         this.entries.set(repoRoot, entry);
 
@@ -133,16 +138,37 @@ class StateManager {
 
     removeFolder(folderPath) {
         for (const [root, entry] of this.entries) {
-            if (pathStartsWith(root, folderPath)) {
-                entry.refreshDebounced.cancel();
-                if (entry.watcher) {
-                    entry.watcher.dispose();
+            if (!entry.folderPaths || entry.folderPaths.size === 0) {
+                // Legacy entries with no tracked contributors fall back to the
+                // historical "root under removed folder" heuristic.
+                if (pathStartsWith(root, folderPath)) {
+                    this.disposeEntry(entry);
+                    this.entries.delete(root);
                 }
-                if (entry.autoFetchTimer) {
-                    clearInterval(entry.autoFetchTimer);
+                continue;
+            }
+            // Drop any contributing folder that was equal to or nested under the
+            // removed workspace folder. Only unregister the repo when no
+            // contributing folder remains.
+            for (const fp of Array.from(entry.folderPaths)) {
+                if (pathStartsWith(fp, folderPath)) {
+                    entry.folderPaths.delete(fp);
                 }
+            }
+            if (entry.folderPaths.size === 0) {
+                this.disposeEntry(entry);
                 this.entries.delete(root);
             }
+        }
+    }
+
+    disposeEntry(entry) {
+        entry.refreshDebounced.cancel();
+        if (entry.watcher) {
+            entry.watcher.dispose();
+        }
+        if (entry.autoFetchTimer) {
+            clearInterval(entry.autoFetchTimer);
         }
     }
 
@@ -151,13 +177,7 @@ class StateManager {
         for (const root of folders) {
             const e = this.entries.get(root);
             if (e) {
-                e.refreshDebounced.cancel();
-                if (e.watcher) {
-                    e.watcher.dispose();
-                }
-                if (e.autoFetchTimer) {
-                    clearInterval(e.autoFetchTimer);
-                }
+                this.disposeEntry(e);
             }
             this.entries.delete(root);
         }
@@ -211,8 +231,20 @@ class StateManager {
                 if (!api) {
                     return;
                 }
+                // Track per-repository subscriptions so that closed repositories
+                // release their listener instead of accumulating for the lifetime
+                // of the extension host.
+                const repoSubs = new Map();
+                const keyOf = (repository) => {
+                    const u = repository && repository.rootUri;
+                    return u ? u.toString() : undefined;
+                };
                 const subscribe = (repository) => {
                     if (!repository || !repository.state || typeof repository.state.onDidChange !== 'function') {
+                        return;
+                    }
+                    const key = keyOf(repository);
+                    if (key && repoSubs.has(key)) {
                         return;
                     }
                     const repoFsPath = repository.rootUri && repository.rootUri.fsPath;
@@ -225,7 +257,21 @@ class StateManager {
                             }
                         }
                     });
+                    if (key) {
+                        repoSubs.set(key, sub);
+                    }
                     this.disposables.push(sub);
+                };
+                const unsubscribe = (repository) => {
+                    const key = keyOf(repository);
+                    if (!key) {
+                        return;
+                    }
+                    const sub = repoSubs.get(key);
+                    if (sub) {
+                        sub.dispose();
+                        repoSubs.delete(key);
+                    }
                 };
                 for (const r of api.repositories || []) {
                     subscribe(r);
@@ -233,6 +279,19 @@ class StateManager {
                 if (typeof api.onDidOpenRepository === 'function') {
                     this.disposables.push(api.onDidOpenRepository(subscribe));
                 }
+                if (typeof api.onDidCloseRepository === 'function') {
+                    this.disposables.push(api.onDidCloseRepository(unsubscribe));
+                }
+                // Ensure all per-repo subscriptions are released on dispose even
+                // if the close event never fires.
+                this.disposables.push({
+                    dispose: () => {
+                        for (const sub of repoSubs.values()) {
+                            try { sub.dispose(); } catch { /* ignore */ }
+                        }
+                        repoSubs.clear();
+                    }
+                });
             }).catch(() => { /* best-effort */ });
         } catch {
             // git extension not available

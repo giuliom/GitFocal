@@ -192,23 +192,39 @@ function registerTagCommands(ctx) {
             }
             const { state, tag } = resolved;
             const remotes = await git.listRemotes(state.repoPath).catch(() => []);
-            let remote = 'origin';
             if (remotes.length === 0) {
                 void vscode.window.showInformationMessage('GitFocal: no remotes configured.');
                 return;
             }
-            if (remotes.length > 1) {
+
+            let remote;
+            if (remotes.includes('origin')) {
+                remote = 'origin';
+            } else if (remotes.length === 1) {
+                remote = remotes[0];
+            } else {
                 const pick = await vscode.window.showQuickPick(remotes, { placeHolder: 'Push tag to remote' });
                 if (!pick) {
                     return;
                 }
                 remote = pick;
-            } else {
-                remote = remotes[0];
             }
+
+            const force = remote === 'origin' && tag.originStatus === 'different';
+            if (force) {
+                const ok = await confirm(
+                    `Replace tag '${tag.name}' on origin (${tag.originCommitHash || 'different commit'}) with local ${tag.commitHash || 'commit'}?`,
+                    'Force Push'
+                );
+                if (!ok) {
+                    return;
+                }
+            }
+
             try {
-                await withProgress(`Push tag ${tag.name} to ${remote}`, () =>
-                    git.pushTag(state.repoPath, tag.name, remote));
+                await withProgress(`${force ? 'Force push' : 'Push'} tag ${tag.name} to ${remote}`, () =>
+                    git.pushTag(state.repoPath, tag.name, remote, { force }));
+                await stateManager.refresh(state.repoPath);
             } catch (err) {
                 reportGitError(err, `Failed to push tag ${tag.name}`);
             }

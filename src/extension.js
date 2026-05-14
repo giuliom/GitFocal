@@ -40,7 +40,8 @@ async function activate(context) {
         ...registerTopCommands(cmdCtx),
         ...registerBranchCommands(cmdCtx),
         ...registerStashCommands(cmdCtx),
-        ...registerTagCommands(cmdCtx)
+        ...registerTagCommands(cmdCtx),
+        vscode.commands.registerCommand('gitfocal.loadMoreCommits', element => branchesProvider.loadMoreCommits(element))
     );
 
     context.subscriptions.push(
