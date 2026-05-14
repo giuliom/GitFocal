@@ -22,10 +22,15 @@ async function activate(context) {
     const stateManager = new StateManager(git);
     context.subscriptions.push(stateManager);
 
+    // Construct the decoration provider BEFORE the branches tree provider so
+    // its `onDidChange` handler runs first when state refreshes. That way
+    // decorations are invalidated before the tree rebuilds its items, and the
+    // newly rendered branch labels pick up fresh colors immediately instead of
+    // briefly flashing back to the default (white) color.
+    const branchDecorationProvider = new BranchDecorationProvider(stateManager);
     const branchesProvider = new BranchesTreeProvider(stateManager, git);
     const stashesProvider = new StashesTreeProvider(stateManager, git);
     const tagsProvider = new TagsTreeProvider(stateManager);
-    const branchDecorationProvider = new BranchDecorationProvider(stateManager);
     context.subscriptions.push(branchesProvider, stashesProvider, tagsProvider, branchDecorationProvider);
 
     context.subscriptions.push(

@@ -42,7 +42,10 @@ function formatBranchStatus(branch) {
     if (s === 'ahead' || s === 'behind' || s === 'diverged') {
         return s;
     }
-    return ''; // 'synced' or 'no-upstream' \u2192 no status word
+    if (s === 'no-upstream' && !branch.isRemote) {
+        return 'local';
+    }
+    return ''; // 'synced' or remote no-upstream \u2192 no status word
 }
 
 function formatBranchDescription(branch) {

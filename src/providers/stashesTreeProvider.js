@@ -49,7 +49,6 @@ class StashesTreeProvider {
             item.tooltip = `${statusLabel(element.file.status)}: ${element.file.path}`;
             item.iconPath = iconForStatus(element.file.status);
             item.contextValue = 'stashFile';
-            item.resourceUri = vscode.Uri.file(path.join(element.repoPath, element.file.path));
             return item;
         }
         if (element.kind === 'stashFileMore') {

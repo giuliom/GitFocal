@@ -20,7 +20,24 @@ class BranchDecorationProvider {
         this.stateManager = stateManager;
         this._onDidChange = new vscode.EventEmitter();
         this.onDidChangeFileDecorations = this._onDidChange.event;
-        this._sub = stateManager.onDidChange(() => this._onDidChange.fire(undefined));
+        this._sub = stateManager.onDidChange(() => this.fireForCurrentBranches());
+    }
+
+    fireForCurrentBranches() {
+        const uris = [];
+        for (const state of this.stateManager.getStates()) {
+            for (const branch of state.branches) {
+                if (branch.isRemote) {
+                    continue;
+                }
+                uris.push(branchUri(state.repoPath, branch.name));
+            }
+        }
+        // Fire with the explicit set of branch URIs we decorate. This is a
+        // narrower invalidation than `undefined` (which would re-query every
+        // decorated URI in the workbench) and avoids a brief frame where labels
+        // render without their color while VS Code is re-querying.
+        this._onDidChange.fire(uris);
     }
 
     provideFileDecoration(uri) {

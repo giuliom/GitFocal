@@ -106,11 +106,15 @@ class BranchesTreeProvider {
             }
             case 'commit': {
                 const c = element.commit;
+                const tags = element.tags || [];
                 const item = new vscode.TreeItem(c.subject || c.shortHash, vscode.TreeItemCollapsibleState.None);
                 item.iconPath = new vscode.ThemeIcon('git-commit');
-                item.description = `${c.shortHash} \u2022 ${c.relativeDate}`;
-                item.tooltip = buildCommitTooltip(c);
-                item.contextValue = 'commit';
+                const tagPrefix = tags.length > 0
+                    ? tags.map(t => `\u{1F3F7} ${t.name}`).join(' ') + ' \u2022 '
+                    : '';
+                item.description = `${tagPrefix}${c.shortHash} \u2022 ${c.relativeDate}`;
+                item.tooltip = buildCommitTooltip(c, tags);
+                item.contextValue = tags.length > 0 ? 'commit.tagged' : 'commit';
                 return item;
             }
             case 'commitMore': {
@@ -262,6 +266,8 @@ class BranchesTreeProvider {
         }
         const key = branchCommitsKey(element.repoPath, ref);
         const desired = this.loadedCommitCounts.get(key) || INITIAL_COMMITS_PER_BRANCH;
+        const state = this.stateManager.getState(element.repoPath);
+        const tagsByCommit = buildTagsByCommit(state);
         try {
             // Request one extra to detect whether more commits are available.
             const commits = await this.git.getBranchCommits(element.repoPath, ref, desired + 1);
@@ -272,7 +278,8 @@ class BranchesTreeProvider {
                 label: c.subject || c.shortHash,
                 repoPath: element.repoPath,
                 branch,
-                commit: c
+                commit: c,
+                tags: tagsByCommit.get(c.hash) || []
             }));
             if (hasMore) {
                 items.push({
@@ -327,7 +334,7 @@ function branchCommitsKey(repoPath, refName) {
     return `${repoPath}\x1f${refName}`;
 }
 
-function buildCommitTooltip(commit) {
+function buildCommitTooltip(commit, tags) {
     const md = new vscode.MarkdownString();
     md.appendMarkdown(`**${commit.subject || commit.shortHash}**\n\n`);
     md.appendMarkdown(`- hash: \`${commit.hash}\`\n`);
@@ -337,7 +344,30 @@ function buildCommitTooltip(commit) {
     if (commit.relativeDate) {
         md.appendMarkdown(`- date: ${commit.relativeDate}\n`);
     }
+    if (tags && tags.length > 0) {
+        md.appendMarkdown(`- tags: ${tags.map(t => `\`${t.name}\``).join(', ')}\n`);
+    }
     return md;
+}
+
+function buildTagsByCommit(state) {
+    const map = new Map();
+    if (!state || !Array.isArray(state.tags)) {
+        return map;
+    }
+    for (const tag of state.tags) {
+        const key = tag.commitHashFull || tag.commitHash;
+        if (!key) {
+            continue;
+        }
+        const list = map.get(key);
+        if (list) {
+            list.push(tag);
+        } else {
+            map.set(key, [tag]);
+        }
+    }
+    return map;
 }
 
 function buildBranchTooltip(branch) {

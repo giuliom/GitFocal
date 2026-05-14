@@ -192,9 +192,29 @@ function registerBranchCommands(ctx) {
         }),
 
         vscode.commands.registerCommand('gitfocal.reset', async (arg) => {
-            const resolved = await resolveBranchNode(stateManager, arg, { placeHolder: 'Reset current to...' });
-            if (!resolved) {
-                return;
+            let repoPath;
+            let target;
+            let targetLabel;
+            if (arg && arg.kind === 'commit' && arg.commit) {
+                repoPath = arg.repoPath;
+                target = arg.commit.hash;
+                targetLabel = arg.commit.shortHash || arg.commit.hash;
+            } else {
+                const resolved = await resolveBranchNode(stateManager, arg, { placeHolder: 'Reset current to...' });
+                if (!resolved) {
+                    return;
+                }
+                repoPath = resolved.state.repoPath;
+                const entered = await vscode.window.showInputBox({
+                    prompt: 'Reset current branch to (commit hash, branch, tag, or any revision)',
+                    value: resolved.branchName,
+                    validateInput: v => v && v.trim() ? null : 'Enter a target revision'
+                });
+                if (entered === undefined) {
+                    return;
+                }
+                target = entered.trim();
+                targetLabel = target;
             }
             const mode = await vscode.window.showQuickPick(
                 [
@@ -202,21 +222,21 @@ function registerBranchCommands(ctx) {
                     { label: 'mixed', description: 'Keep working tree, reset index' },
                     { label: 'hard', description: 'Discard all changes (destructive)' }
                 ],
-                { placeHolder: 'Reset mode' }
+                { placeHolder: `Reset mode (target: ${targetLabel})` }
             );
             if (!mode) {
                 return;
             }
             if (mode.label === 'hard') {
-                const ok = await confirm(`Hard reset will discard all uncommitted changes. Reset to ${resolved.branchName}?`, 'Reset --hard');
+                const ok = await confirm(`Hard reset will discard all uncommitted changes. Reset to ${targetLabel}?`, 'Reset --hard');
                 if (!ok) {
                     return;
                 }
             }
             try {
-                await withProgress(`Reset --${mode.label} to ${resolved.branchName}`,
-                    () => git.resetBranch(resolved.state.repoPath, resolved.branchName, mode.label));
-                await stateManager.refresh(resolved.state.repoPath);
+                await withProgress(`Reset --${mode.label} to ${targetLabel}`,
+                    () => git.resetBranch(repoPath, target, mode.label));
+                await stateManager.refresh(repoPath);
             } catch (err) {
                 reportGitError(err, 'Reset failed');
             }

@@ -125,10 +125,11 @@
         { "command": "gitfocal.copyUpstream", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "9_copy@2" },
         { "command": "gitfocal.copyCommitHash", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "9_copy@3" },
 
-        { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.branches && viewItem == commit", "group": "inline@1" },
-        { "command": "gitfocal.copyCommit", "when": "view == gitfocal.branches && viewItem == commit", "group": "inline@2" },
-        { "command": "gitfocal.copyCommit", "when": "view == gitfocal.branches && viewItem == commit", "group": "9_copy@1" },
-        { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.branches && viewItem == commit", "group": "1_commit@1" },
+        { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "inline@1" },
+        { "command": "gitfocal.copyCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "inline@2" },
+        { "command": "gitfocal.copyCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "9_copy@1" },
+        { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "1_commit@1" },
+        { "command": "gitfocal.reset", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "3_history@1" },
 
         { "command": "gitfocal.stashApply", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@1" },
         { "command": "gitfocal.stashPop", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@2" },
@@ -142,8 +143,8 @@
         { "command": "gitfocal.stashApplyFile", "when": "view == gitfocal.stashes && viewItem == stashFile", "group": "inline@1" },
         { "command": "gitfocal.stashApplyFile", "when": "view == gitfocal.stashes && viewItem == stashFile", "group": "1_stash@1" },
 
-        { "command": "gitfocal.tagCommit", "when": "view == gitfocal.branches && viewItem == commit", "group": "inline@0" },
-        { "command": "gitfocal.tagCommit", "when": "view == gitfocal.branches && viewItem == commit", "group": "1_commit@2" },
+        { "command": "gitfocal.tagCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "inline@0" },
+        { "command": "gitfocal.tagCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "1_commit@2" },
 
         { "command": "gitfocal.checkoutTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "inline@1" },
         { "command": "gitfocal.pushTag", "when": "view == gitfocal.tags && viewItem == tag.pushable", "group": "inline@2" },

@@ -481,45 +481,99 @@ class GitService {
 
     async stashPushPaths(repoPath, paths, message, options) {
         const opts = options || {};
-        const args = ['stash', 'push'];
-        let stagedUntrackedPaths = [];
-        if (opts.staged) {
-            args.push('--staged');
-        }
-        if (opts.keepIndex) {
-            args.push('--keep-index');
-        }
-        if (opts.includeUntracked) {
-            args.push('-u');
-        }
-        if (message) {
-            args.push('-m', message);
-        }
-        if (paths && paths.length > 0) {
-            // `git stash push -- <path>` rejects untracked paths. Stage only the
-            // selected untracked entries so Git can stash them without widening
-            // the stash scope to every untracked file in the repository.
-            stagedUntrackedPaths = await this.getUntrackedPaths(repoPath, paths);
-            if (stagedUntrackedPaths.length > 0) {
-                await this.stagePaths(repoPath, stagedUntrackedPaths);
-            }
-            args.push('--');
-            for (const p of paths) {
-                args.push(p);
-            }
-        }
-        try {
+
+        // Path-less form: behaves like the regular stash variants.
+        if (!paths || paths.length === 0) {
+            const args = ['stash', 'push'];
+            if (opts.staged) args.push('--staged');
+            if (opts.keepIndex) args.push('--keep-index');
+            if (opts.includeUntracked) args.push('-u');
+            if (message) args.push('-m', message);
             await this.exec(repoPath, args);
+            return;
+        }
+
+        // `git stash push -- <pathspec>` is NOT actually scoped to the pathspec
+        // for the index portion of the stash entry: git always snapshots the
+        // full index. So if other files are staged/modified/untracked, they end
+        // up captured by the stash too (and would be re-applied on pop).
+        //
+        // To produce a stash that contains *only* the selected paths, we:
+        //   1. Temporarily stash every OTHER changed path (with -u so untracked
+        //      ones are included).
+        //   2. Stash the selected paths in isolation.
+        //   3. Pop the temp stash with --index to restore the prior
+        //      staged/unstaged/untracked state of the unaffected files.
+        const selectedSet = new Set(paths);
+        const allChanged = await this.getChangedPaths(repoPath);
+        const others = allChanged.filter(p => !selectedSet.has(p));
+
+        let tempStashed = false;
+        if (others.length > 0) {
+            const tempArgs = ['stash', 'push', '-u', '-m', 'gitfocal: temporary (stash selected)', '--', ...others];
+            await this.exec(repoPath, tempArgs);
+            tempStashed = true;
+        }
+
+        try {
+            // -u ensures any selected untracked files are also captured. With a
+            // pathspec, -u only includes untracked entries that match it, so
+            // unrelated untracked files (already moved to the temp stash) are
+            // not pulled in.
+            const args = ['stash', 'push', '-u'];
+            if (message) args.push('-m', message);
+            args.push('--', ...paths);
+            try {
+                await this.exec(repoPath, args);
+            } catch (err) {
+                // The selected paths may have no changes (e.g. user picked a
+                // file that wasn't actually modified). Treat that as a no-op
+                // rather than an error so we can still restore the temp stash.
+                const msg = err instanceof Error ? err.message : String(err || '');
+                if (!/no local changes to save/i.test(msg)) {
+                    throw err;
+                }
+            }
         } catch (err) {
-            if (stagedUntrackedPaths.length > 0) {
+            if (tempStashed) {
+                // Restore the others we set aside before re-throwing.
                 try {
-                    await this.unstagePaths(repoPath, stagedUntrackedPaths);
+                    await this.exec(repoPath, ['stash', 'pop', '--index', 'stash@{0}']);
                 } catch {
-                    // Best-effort cleanup; preserve the original stash failure.
+                    // Best-effort; preserve the original failure for the user.
                 }
             }
             throw err;
         }
+
+        if (tempStashed) {
+            // After step 2 the temp stash is at index 1 (selected stash at 0).
+            await this.exec(repoPath, ['stash', 'pop', '--index', 'stash@{1}']);
+        }
+    }
+
+    async getChangedPaths(repoPath) {
+        const out = await this.exec(repoPath, [
+            'status', '-z', '--porcelain', '--untracked-files=all'
+        ], { allowFailure: true });
+        if (!out) return [];
+        const tokens = out.split('\0');
+        const paths = [];
+        for (let i = 0; i < tokens.length; i++) {
+            const tok = tokens[i];
+            if (!tok || tok.length < 4) continue;
+            const xy = tok.substring(0, 2);
+            const filePath = tok.substring(3);
+            // Renames/copies are emitted as "XY <new>\0<old>\0"; consume the
+            // old-path token so it isn't mistaken for the next entry.
+            if (xy.charAt(0) === 'R' || xy.charAt(0) === 'C') {
+                i++;
+            }
+            if (filePath) {
+                paths.push(filePath);
+            }
+        }
+        return paths;
     }
 
     async stashAllChanges(repoPath, message) {
