@@ -10,7 +10,9 @@ const Icons = {
     repo: new vscode.ThemeIcon('repo'),
     remoteGroup: new vscode.ThemeIcon('cloud'),
     localGroup: new vscode.ThemeIcon('git-branch'),
-    workTreeGroup: new vscode.ThemeIcon('multiple-windows')
+    workTreeGroup: new vscode.ThemeIcon('multiple-windows'),
+    tag: new vscode.ThemeIcon('tag'),
+    tagAnnotated: new vscode.ThemeIcon('bookmark')
 };
 
 function iconNameForBranch(branch) {

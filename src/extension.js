@@ -5,9 +5,11 @@ const { GitService } = require('./git/gitService');
 const { StateManager } = require('./models/stateManager');
 const { BranchesTreeProvider } = require('./providers/branchesTreeProvider');
 const { StashesTreeProvider } = require('./providers/stashesTreeProvider');
+const { TagsTreeProvider } = require('./providers/tagsTreeProvider');
 const { BranchDecorationProvider } = require('./ui/branchDecorationProvider');
 const { registerBranchCommands } = require('./commands/branchCommands');
 const { registerStashCommands } = require('./commands/stashCommands');
+const { registerTagCommands } = require('./commands/tagCommands');
 const { registerTopCommands } = require('./commands/topCommands');
 const { resetGitPathCache } = require('./utils/gitPathResolver');
 const preferences = require('./models/preferences');
@@ -21,12 +23,14 @@ async function activate(context) {
 
     const branchesProvider = new BranchesTreeProvider(stateManager, git);
     const stashesProvider = new StashesTreeProvider(stateManager, git);
+    const tagsProvider = new TagsTreeProvider(stateManager);
     const branchDecorationProvider = new BranchDecorationProvider(stateManager);
-    context.subscriptions.push(branchesProvider, stashesProvider, branchDecorationProvider);
+    context.subscriptions.push(branchesProvider, stashesProvider, tagsProvider, branchDecorationProvider);
 
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider('gitfocal.branches', branchesProvider),
         vscode.window.registerTreeDataProvider('gitfocal.stashes', stashesProvider),
+        vscode.window.registerTreeDataProvider('gitfocal.tags', tagsProvider),
         vscode.window.registerFileDecorationProvider(branchDecorationProvider)
     );
 
@@ -34,7 +38,8 @@ async function activate(context) {
     context.subscriptions.push(
         ...registerTopCommands(cmdCtx),
         ...registerBranchCommands(cmdCtx),
-        ...registerStashCommands(cmdCtx)
+        ...registerStashCommands(cmdCtx),
+        ...registerTagCommands(cmdCtx)
     );
 
     context.subscriptions.push(

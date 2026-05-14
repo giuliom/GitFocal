@@ -85,7 +85,6 @@ src/
 - [ ] Ensure cross platform functionality
 - [ ] Better support for worktrees and submodules
 - [ ] Diff viewer integration for stashes
-- [ ] Tag management view
 - [ ] Group local branches by prefix (`feature/`, `fix/`, …)
 - [ ] Optional remote branches view (currently hidden)
 - [ ] Unit tests for `gitService` and providers

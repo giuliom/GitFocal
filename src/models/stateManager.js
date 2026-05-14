@@ -257,10 +257,11 @@ class StateManager {
             return;
         }
         try {
-            const [branches, stashes, workTrees, currentBranch] = await Promise.all([
+            const [branches, stashes, workTrees, tags, currentBranch] = await Promise.all([
                 this.git.getBranches(repoPath),
                 this.git.getStashes(repoPath),
                 this.git.getWorkTrees(repoPath),
+                this.git.getTags(repoPath).catch(() => []),
                 this.git.getCurrentBranch(repoPath).catch(() => '')
             ]);
             entry.state = createRepositoryState({
@@ -268,6 +269,7 @@ class StateManager {
                 branches,
                 stashes,
                 workTrees,
+                tags,
                 currentBranch,
                 version: entry.state.version + 1
             });
@@ -279,6 +281,7 @@ class StateManager {
                 branches: entry.state.branches,
                 stashes: entry.state.stashes,
                 workTrees: entry.state.workTrees,
+                tags: entry.state.tags,
                 currentBranch: entry.state.currentBranch,
                 version: entry.state.version + 1,
                 error: message

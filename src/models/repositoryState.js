@@ -6,6 +6,7 @@ function createRepositoryState(init) {
         branches: Object.freeze([...init.branches]),
         stashes: Object.freeze([...init.stashes]),
         workTrees: Object.freeze([...init.workTrees]),
+        tags: Object.freeze([...(init.tags || [])]),
         currentBranch: init.currentBranch,
         lastRefreshed: init.lastRefreshed != null ? init.lastRefreshed : Date.now(),
         version: init.version != null ? init.version : 1,
@@ -20,6 +21,7 @@ function emptyRepositoryState(repoPath) {
         branches: [],
         stashes: [],
         workTrees: [],
+        tags: [],
         currentBranch: '',
         version: 0
     });

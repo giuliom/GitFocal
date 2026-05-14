@@ -488,6 +488,101 @@ class GitService {
     async renameBranch(repoPath, oldName, newName) {
         await this.exec(repoPath, ['branch', '-m', oldName, newName]);
     }
+
+    // --- Tag operations ---
+
+    async getTags(repoPath) {
+        const SEP = '\x1f';
+        const REC = '\x1e';
+        // For annotated tags: %(taggername)/%(taggerdate:relative)/%(contents:subject)
+        // For lightweight tags: those tagger fields are empty; fall back to the commit's
+        // metadata via *fields (which dereference to the target commit).
+        const fmt = [
+            '%(refname)',
+            '%(refname:short)',
+            '%(objecttype)',
+            '%(objectname)',
+            '%(*objectname)',
+            '%(*objectname:short)',
+            '%(taggername)',
+            '%(taggerdate:relative)',
+            '%(contents:subject)',
+            '%(*authorname)',
+            '%(*authordate:relative)',
+            '%(*subject)'
+        ].join(SEP) + REC;
+
+        const out = await this.exec(repoPath, [
+            'for-each-ref',
+            `--format=${fmt}`,
+            '--sort=-creatordate',
+            'refs/tags'
+        ], { allowFailure: true });
+
+        const records = out.split(REC).map(r => r.trim()).filter(Boolean);
+        const tags = [];
+        for (const rec of records) {
+            const f = rec.split(SEP);
+            if (f.length < 12) {
+                continue;
+            }
+            const objectType = f[2];
+            const isAnnotated = objectType === 'tag';
+            // For annotated tags, %(objectname) is the tag object SHA and %(*objectname)
+            // is the dereferenced commit. For lightweight tags, %(*objectname) is empty
+            // and %(objectname) is already the commit.
+            const commitHashFull = f[4] || f[3];
+            const commitHash = f[5] || (commitHashFull ? commitHashFull.substring(0, 7) : '');
+            tags.push({
+                name: f[1],
+                refName: f[0],
+                isAnnotated,
+                commitHash,
+                commitHashFull,
+                tagger: isAnnotated ? (f[6] || undefined) : (f[9] || undefined),
+                taggerDate: isAnnotated ? (f[7] || undefined) : (f[10] || undefined),
+                subject: isAnnotated ? (f[8] || undefined) : (f[11] || undefined)
+            });
+        }
+        return tags;
+    }
+
+    async createTag(repoPath, name, options) {
+        const opts = options || {};
+        const args = ['tag'];
+        if (opts.force) {
+            args.push('-f');
+        }
+        if (opts.message) {
+            args.push('-a', name, '-m', opts.message);
+        } else {
+            args.push(name);
+        }
+        if (opts.ref) {
+            args.push(opts.ref);
+        }
+        await this.exec(repoPath, args);
+    }
+
+    async deleteTag(repoPath, name) {
+        await this.exec(repoPath, ['tag', '-d', name]);
+    }
+
+    async renameTag(repoPath, oldName, newName) {
+        // Preserve the original tag object (annotated or lightweight) by moving the ref
+        // rather than re-creating it (which would dereference to the commit).
+        await this.exec(repoPath, ['update-ref', `refs/tags/${newName}`, `refs/tags/${oldName}`]);
+        await this.exec(repoPath, ['update-ref', '-d', `refs/tags/${oldName}`]);
+    }
+
+    async pushTag(repoPath, name, remote) {
+        const r = remote || 'origin';
+        await this.exec(repoPath, ['push', r, `refs/tags/${name}`]);
+    }
+
+    async deleteRemoteTag(repoPath, remote, name) {
+        await this.exec(repoPath, ['push', remote, '--delete', `refs/tags/${name}`]);
+    }
 }
 
 function parseAheadBehind(track) {
