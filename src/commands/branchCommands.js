@@ -272,6 +272,37 @@ function registerBranchCommands(ctx) {
             void vscode.window.showInformationMessage(`Copied: ${arg.branch.commitHashFull}`);
         }),
 
+        vscode.commands.registerCommand('gitfocal.copyCommit', async (arg) => {
+            if (!arg || arg.kind !== 'commit' || !arg.commit) {
+                return;
+            }
+            await vscode.env.clipboard.writeText(arg.commit.hash);
+            void vscode.window.showInformationMessage(`Copied: ${arg.commit.hash}`);
+        }),
+
+        vscode.commands.registerCommand('gitfocal.cherryPickCommit', async (arg) => {
+            if (!arg || arg.kind !== 'commit' || !arg.commit) {
+                return;
+            }
+            const repo = await pickRepo(stateManager, arg.repoPath);
+            if (!repo) {
+                return;
+            }
+            const short = arg.commit.shortHash || arg.commit.hash.substring(0, 7);
+            const subject = arg.commit.subject ? ` "${arg.commit.subject}"` : '';
+            const ok = await confirm(`Cherry-pick ${short}${subject} onto current branch?`, 'Cherry-pick');
+            if (!ok) {
+                return;
+            }
+            try {
+                await withProgress(`Cherry-pick ${short}`,
+                    () => git.cherryPick(repo.repoPath, arg.commit.hash));
+                await stateManager.refresh(repo.repoPath);
+            } catch (err) {
+                reportGitError(err, `Failed to cherry-pick ${short}`);
+            }
+        }),
+
         vscode.commands.registerCommand('gitfocal.renameBranch', async (arg) => {
             const resolved = await resolveBranchNode(stateManager, arg, {
                 localOnly: true,

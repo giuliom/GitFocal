@@ -7,9 +7,12 @@ const { formatBranchDescription, colorForBranch } = require('../ui/decorations')
 const { branchUri } = require('../ui/branchDecorationProvider');
 const preferences = require('../models/preferences');
 
+const COMMITS_PER_BRANCH = 10;
+
 class BranchesTreeProvider {
-    constructor(stateManager) {
+    constructor(stateManager, git) {
         this.stateManager = stateManager;
+        this.git = git;
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
         this.disposables = [];
@@ -71,7 +74,7 @@ class BranchesTreeProvider {
             }
             case 'branch': {
                 const branch = element.branch;
-                const item = new vscode.TreeItem(branch.name, vscode.TreeItemCollapsibleState.None);
+                const item = new vscode.TreeItem(branch.name, vscode.TreeItemCollapsibleState.Collapsed);
                 item.iconPath = new vscode.ThemeIcon(iconNameForBranch(branch), colorForBranch(branch));
                 item.description = formatBranchDescription(branch);
                 item.tooltip = buildBranchTooltip(branch);
@@ -89,6 +92,21 @@ class BranchesTreeProvider {
                     title: 'Checkout',
                     arguments: [element]
                 };
+                return item;
+            }
+            case 'commit': {
+                const c = element.commit;
+                const item = new vscode.TreeItem(c.subject || c.shortHash, vscode.TreeItemCollapsibleState.None);
+                item.iconPath = new vscode.ThemeIcon('git-commit');
+                item.description = `${c.shortHash} \u2022 ${c.relativeDate}`;
+                item.tooltip = buildCommitTooltip(c);
+                item.contextValue = 'commit';
+                return item;
+            }
+            case 'commitMore': {
+                const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
+                item.iconPath = new vscode.ThemeIcon('ellipsis');
+                item.contextValue = 'commitMore';
                 return item;
             }
             default:
@@ -156,6 +174,9 @@ class BranchesTreeProvider {
                     .filter(b => b.workTreePath === wtPath)
                     .map(b => ({ kind: 'branch', label: b.name, repoPath: state.repoPath, branch: b }));
             }
+            case 'branch': {
+                return this.buildBranchCommits(element);
+            }
             default:
                 return [];
         }
@@ -207,6 +228,46 @@ class BranchesTreeProvider {
             workTree: wt
         }));
     }
+
+    async buildBranchCommits(element) {
+        if (!this.git) {
+            return [];
+        }
+        const branch = element.branch;
+        const ref = branch && (branch.refName || branch.name);
+        if (!ref) {
+            return [];
+        }
+        try {
+            const commits = await this.git.getBranchCommits(element.repoPath, ref, COMMITS_PER_BRANCH);
+            return commits.map(c => ({
+                kind: 'commit',
+                label: c.subject || c.shortHash,
+                repoPath: element.repoPath,
+                branch,
+                commit: c
+            }));
+        } catch {
+            return [{
+                kind: 'commitMore',
+                label: 'Failed to load commits',
+                repoPath: element.repoPath
+            }];
+        }
+    }
+}
+
+function buildCommitTooltip(commit) {
+    const md = new vscode.MarkdownString();
+    md.appendMarkdown(`**${commit.subject || commit.shortHash}**\n\n`);
+    md.appendMarkdown(`- hash: \`${commit.hash}\`\n`);
+    if (commit.author) {
+        md.appendMarkdown(`- author: ${commit.author}\n`);
+    }
+    if (commit.relativeDate) {
+        md.appendMarkdown(`- date: ${commit.relativeDate}\n`);
+    }
+    return md;
 }
 
 function buildBranchTooltip(branch) {

@@ -39,23 +39,20 @@ function colorForBranch(branch) {
 
 function formatBranchStatus(branch) {
     const s = branchStatus(branch);
-    if (s === 'no-upstream') {
-        return 'local';
-    }
     if (s === 'ahead' || s === 'behind' || s === 'diverged') {
         return s;
     }
-    return ''; // 'synced' \u2192 no status word
+    return ''; // 'synced' or 'no-upstream' \u2192 no status word
 }
 
 function formatBranchDescription(branch) {
     const segments = [];
+    if (branch.upstream) {
+        segments.push(`\u2192 ${branch.upstream}`);
+    }
     const status = formatBranchStatus(branch);
     if (status) {
         segments.push(`(${status})`);
-    }
-    if (branch.upstream) {
-        segments.push(`\u2192 ${branch.upstream}`);
     }
     segments.push(branch.commitHash);
     return segments.join(' ');

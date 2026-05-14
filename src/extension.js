@@ -19,8 +19,8 @@ async function activate(context) {
     const stateManager = new StateManager(git);
     context.subscriptions.push(stateManager);
 
-    const branchesProvider = new BranchesTreeProvider(stateManager);
-    const stashesProvider = new StashesTreeProvider(stateManager);
+    const branchesProvider = new BranchesTreeProvider(stateManager, git);
+    const stashesProvider = new StashesTreeProvider(stateManager, git);
     const branchDecorationProvider = new BranchDecorationProvider(stateManager);
     context.subscriptions.push(branchesProvider, stashesProvider, branchDecorationProvider);
 

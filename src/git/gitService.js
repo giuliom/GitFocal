@@ -182,6 +182,60 @@ class GitService {
         return stashes;
     }
 
+    async getBranchCommits(repoPath, refName, limit) {
+        const SEP = '\x1f';
+        const REC = '\x1e';
+        const max = Math.max(1, limit || 10);
+        const fmt = ['%H', '%h', '%s', '%an', '%ar'].join(SEP) + REC;
+        const out = await this.exec(repoPath, [
+            'log',
+            `-n${max}`,
+            `--format=${fmt}`,
+            refName,
+            '--'
+        ], { allowFailure: true });
+
+        const records = out.split(REC).map(r => r.trim()).filter(Boolean);
+        const commits = [];
+        for (const rec of records) {
+            const fields = rec.split(SEP);
+            if (fields.length < 5) {
+                continue;
+            }
+            commits.push({
+                hash: fields[0],
+                shortHash: fields[1],
+                subject: fields[2],
+                author: fields[3],
+                relativeDate: fields[4]
+            });
+        }
+        return commits;
+    }
+
+    async getStashFiles(repoPath, stashId) {
+        const out = await this.exec(repoPath, [
+            'stash', 'show', '--name-status', stashId
+        ], { allowFailure: true });
+
+        const files = [];
+        const lines = out.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        for (const line of lines) {
+            // Format: "<status>\t<path>" e.g. "M\tsrc/foo.js"
+            const tab = line.indexOf('\t');
+            if (tab < 0) {
+                continue;
+            }
+            const status = line.substring(0, tab).trim();
+            const filePath = line.substring(tab + 1).trim();
+            if (!filePath) {
+                continue;
+            }
+            files.push({ status, path: filePath });
+        }
+        return files;
+    }
+
     async getWorkTrees(repoPath) {
         const out = await this.exec(repoPath, ['worktree', 'list', '--porcelain']);
         const records = out.split(/\r?\n\r?\n/).map(r => r.trim()).filter(Boolean);
@@ -258,6 +312,10 @@ class GitService {
 
     async rebaseBranch(repoPath, onto) {
         await this.exec(repoPath, ['rebase', onto]);
+    }
+
+    async cherryPick(repoPath, hash) {
+        await this.exec(repoPath, ['cherry-pick', hash]);
     }
 
     async fetchRemote(repoPath, remote) {
@@ -384,6 +442,11 @@ class GitService {
 
     async stashApply(repoPath, id) {
         await this.exec(repoPath, ['stash', 'apply', id]);
+    }
+
+    async stashApplyFile(repoPath, id, filePath) {
+        // Restore a single file from the stash into the working tree.
+        await this.exec(repoPath, ['checkout', id, '--', filePath]);
     }
 
     async stashPop(repoPath, id) {

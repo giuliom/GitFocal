@@ -82,6 +82,26 @@ function registerStashCommands(ctx) {
             }
         }),
 
+        vscode.commands.registerCommand('gitfocal.stashApplyFile', async (arg) => {
+            if (!arg || arg.kind !== 'stashFile' || !arg.file || !arg.stash) {
+                return;
+            }
+            const ok = await confirm(
+                `Restore "${arg.file.path}" from ${arg.stash.id}? This overwrites the file in the working tree.`,
+                'Restore'
+            );
+            if (!ok) {
+                return;
+            }
+            try {
+                await withProgress(`Restore ${arg.file.path} from ${arg.stash.id}`,
+                    () => git.stashApplyFile(arg.repoPath, arg.stash.id, arg.file.path));
+                await stateManager.refresh(arg.repoPath);
+            } catch (err) {
+                reportGitError(err, `Failed to restore ${arg.file.path} from ${arg.stash.id}`);
+            }
+        }),
+
         vscode.commands.registerCommand('gitfocal.stashAllChanges', async (arg, others) => {
             await runScmStash(ctx, arg, others, 'all');
         }),

@@ -5,8 +5,9 @@ const vscode = require('vscode');
 const { Icons } = require('../ui/icons');
 
 class StashesTreeProvider {
-    constructor(stateManager) {
+    constructor(stateManager, git) {
         this.stateManager = stateManager;
+        this.git = git;
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
         this.disposables = [];
@@ -35,11 +36,25 @@ class StashesTreeProvider {
             item.tooltip = element.repoPath;
             return item;
         }
+        if (element.kind === 'stashFile') {
+            const item = new vscode.TreeItem(path.basename(element.file.path), vscode.TreeItemCollapsibleState.None);
+            item.description = element.file.path;
+            item.tooltip = `${statusLabel(element.file.status)}: ${element.file.path}`;
+            item.iconPath = iconForStatus(element.file.status);
+            item.contextValue = 'stashFile';
+            item.resourceUri = vscode.Uri.file(path.join(element.repoPath, element.file.path));
+            return item;
+        }
+        if (element.kind === 'stashFileMore') {
+            const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
+            item.iconPath = new vscode.ThemeIcon('ellipsis');
+            return item;
+        }
         const stash = element.stash;
         const label = stash.subject || stash.description || stash.id;
-        const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+        const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
         item.iconPath = Icons.stash;
-        item.description = stash.branch || '';
+        item.description = stash.branch ? `on ${stash.branch}` : '';
         item.tooltip = buildStashTooltip(stash);
         item.contextValue = 'stash';
         return item;
@@ -67,6 +82,9 @@ class StashesTreeProvider {
             }
             return this.buildStashes(state);
         }
+        if (element.kind === 'stash') {
+            return this.buildStashFiles(element);
+        }
         return [];
     }
 
@@ -80,6 +98,50 @@ class StashesTreeProvider {
                 repoPath: state.repoPath,
                 stash: s
             }));
+    }
+
+    async buildStashFiles(element) {
+        if (!this.git) {
+            return [];
+        }
+        try {
+            const files = await this.git.getStashFiles(element.repoPath, element.stash.id);
+            if (files.length === 0) {
+                return [{ kind: 'stashFileMore', label: '(no files)', repoPath: element.repoPath }];
+            }
+            return files.map(f => ({
+                kind: 'stashFile',
+                label: f.path,
+                repoPath: element.repoPath,
+                stash: element.stash,
+                file: f
+            }));
+        } catch {
+            return [{ kind: 'stashFileMore', label: 'Failed to load files', repoPath: element.repoPath }];
+        }
+    }
+}
+
+function statusLabel(status) {
+    switch ((status || '').charAt(0)) {
+        case 'A': return 'Added';
+        case 'M': return 'Modified';
+        case 'D': return 'Deleted';
+        case 'R': return 'Renamed';
+        case 'C': return 'Copied';
+        case 'U': return 'Unmerged';
+        case 'T': return 'Type changed';
+        default: return status || 'Changed';
+    }
+}
+
+function iconForStatus(status) {
+    switch ((status || '').charAt(0)) {
+        case 'A': return new vscode.ThemeIcon('diff-added');
+        case 'D': return new vscode.ThemeIcon('diff-removed');
+        case 'R': return new vscode.ThemeIcon('diff-renamed');
+        case 'M':
+        default: return new vscode.ThemeIcon('diff-modified');
     }
 }
 

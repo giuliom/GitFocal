@@ -83,10 +83,8 @@ src/
 ## TODO
 
 - [ ] Ensure cross platform functionality
-- [ ] Commit list for branches
 - [ ] Better support for worktrees and submodules
 - [ ] Diff viewer integration for stashes
-- [ ] Cherry-pick command
 - [ ] Tag management view
 - [ ] Group local branches by prefix (`feature/`, `fix/`, …)
 - [ ] Optional remote branches view (currently hidden)
