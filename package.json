@@ -81,6 +81,8 @@
       { "command": "gitfocal.stashPop", "title": "Pop", "icon": "$(arrow-up)" },
       { "command": "gitfocal.stashDelete", "title": "Delete", "icon": "$(trash)" },
       { "command": "gitfocal.stashRename", "title": "Rename...", "icon": "$(pencil)" },
+      { "command": "gitfocal.stashDiff", "title": "Open Changes", "icon": "$(diff-multiple)" },
+      { "command": "gitfocal.stashFileDiff", "title": "Open Changes", "icon": "$(diff-multiple)" },
       { "command": "gitfocal.stashApplyFile", "title": "Restore File from Stash", "icon": "$(check)" },
 
       { "command": "gitfocal.stashAllChanges", "title": "Stash All Changes", "icon": "$(archive)" },
@@ -143,16 +145,20 @@
         { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "1_commit@1" },
         { "command": "gitfocal.reset", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "3_history@1" },
 
+        { "command": "gitfocal.stashDiff", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@0" },
         { "command": "gitfocal.stashApply", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@1" },
         { "command": "gitfocal.stashPop", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@2" },
         { "command": "gitfocal.stashDelete", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@3" },
 
+        { "command": "gitfocal.stashDiff", "when": "view == gitfocal.stashes && viewItem == stash", "group": "1_stash@0" },
         { "command": "gitfocal.stashApply", "when": "view == gitfocal.stashes && viewItem == stash", "group": "1_stash@1" },
         { "command": "gitfocal.stashPop", "when": "view == gitfocal.stashes && viewItem == stash", "group": "1_stash@2" },
         { "command": "gitfocal.stashRename", "when": "view == gitfocal.stashes && viewItem == stash", "group": "7_modify@1" },
         { "command": "gitfocal.stashDelete", "when": "view == gitfocal.stashes && viewItem == stash", "group": "8_delete@1" },
 
+        { "command": "gitfocal.stashFileDiff", "when": "view == gitfocal.stashes && viewItem == stashFile", "group": "inline@0" },
         { "command": "gitfocal.stashApplyFile", "when": "view == gitfocal.stashes && viewItem == stashFile", "group": "inline@1" },
+        { "command": "gitfocal.stashFileDiff", "when": "view == gitfocal.stashes && viewItem == stashFile", "group": "1_stash@0" },
         { "command": "gitfocal.stashApplyFile", "when": "view == gitfocal.stashes && viewItem == stashFile", "group": "1_stash@1" },
 
         { "command": "gitfocal.tagCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "inline@0" },
@@ -204,6 +210,8 @@
         { "command": "gitfocal.stashPop", "when": "false" },
         { "command": "gitfocal.stashDelete", "when": "false" },
         { "command": "gitfocal.stashRename", "when": "false" },
+        { "command": "gitfocal.stashDiff", "when": "false" },
+        { "command": "gitfocal.stashFileDiff", "when": "false" },
         { "command": "gitfocal.stashApplyFile", "when": "false" },
         { "command": "gitfocal.stashAllChanges", "when": "false" },
         { "command": "gitfocal.stashStagedChanges", "when": "false" },

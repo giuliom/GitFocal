@@ -9,12 +9,57 @@ const {
     reportGitError,
     withProgress
 } = require('./commandHelpers');
+const { buildStashFileUri, buildStashPatchUri } = require('../providers/stashDiffContentProvider');
 const { pathsEqual, pathStartsWith } = require('../utils/pathUtils');
 
 function registerStashCommands(ctx) {
     const { git, stateManager } = ctx;
 
     return [
+        vscode.commands.registerCommand('gitfocal.stashDiff', async (arg) => {
+            const target = await pickStash(ctx, arg);
+            if (!target) {
+                return;
+            }
+            try {
+                const files = await git.getStashFiles(target.repoPath, target.id);
+                if (files.length === 0) {
+                    void vscode.window.showInformationMessage(`GitFocal: ${target.id} has no changed files.`);
+                    return;
+                }
+                const changes = files.map(file => [
+                    vscode.Uri.file(path.join(target.repoPath, file.path)),
+                    buildStashFileUri(target.repoPath, target.id, file.path, 'left', file.originalPath),
+                    buildStashFileUri(target.repoPath, target.id, file.path, 'right', file.originalPath)
+                ]);
+                await vscode.commands.executeCommand('vscode.changes', `${target.id}: Stash Changes`, changes);
+            } catch (err) {
+                try {
+                    const uri = buildStashPatchUri(target.repoPath, target.id);
+                    const doc = await vscode.workspace.openTextDocument(uri);
+                    await vscode.window.showTextDocument(doc, { preview: true });
+                } catch {
+                    reportGitError(err, `Failed to show diff for ${target.id}`);
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('gitfocal.stashFileDiff', async (arg) => {
+            if (!isStashFileNode(arg)) {
+                return;
+            }
+            const filePath = arg.file.path;
+            const originalPath = arg.file.originalPath;
+            const left = buildStashFileUri(arg.repoPath, arg.stash.id, filePath, 'left', originalPath);
+            const right = buildStashFileUri(arg.repoPath, arg.stash.id, filePath, 'right', originalPath);
+            const titlePath = originalPath && originalPath !== filePath ? `${originalPath} -> ${filePath}` : filePath;
+            try {
+                await vscode.commands.executeCommand('vscode.diff', left, right, `${titlePath} (${arg.stash.id})`, { preview: true });
+            } catch (err) {
+                reportGitError(err, `Failed to show diff for ${filePath}`);
+            }
+        }),
+
         vscode.commands.registerCommand('gitfocal.stashApply', async (arg) => {
             const target = await pickStash(ctx, arg);
             if (!target) {
@@ -273,6 +318,10 @@ function collectResources(arg, others) {
         }
     }
     return list;
+}
+
+function isStashFileNode(arg) {
+    return !!arg && typeof arg === 'object' && arg.kind === 'stashFile' && arg.file && arg.stash;
 }
 
 async function pickStash(ctx, arg) {

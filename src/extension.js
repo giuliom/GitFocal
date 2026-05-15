@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const { GitService } = require('./git/gitService');
 const { StateManager } = require('./models/stateManager');
 const { BranchesTreeProvider } = require('./providers/branchesTreeProvider');
+const { STASH_CONTENT_SCHEME, StashDiffContentProvider } = require('./providers/stashDiffContentProvider');
 const { StashesTreeProvider } = require('./providers/stashesTreeProvider');
 const { TagsTreeProvider } = require('./providers/tagsTreeProvider');
 const { BranchDecorationProvider } = require('./ui/branchDecorationProvider');
@@ -29,6 +30,7 @@ async function activate(context) {
     // briefly flashing back to the default (white) color.
     const branchDecorationProvider = new BranchDecorationProvider(stateManager);
     const branchesProvider = new BranchesTreeProvider(stateManager, git);
+    const stashDiffContentProvider = new StashDiffContentProvider(git);
     const stashesProvider = new StashesTreeProvider(stateManager, git);
     const tagsProvider = new TagsTreeProvider(stateManager);
     context.subscriptions.push(branchesProvider, stashesProvider, tagsProvider, branchDecorationProvider);
@@ -37,6 +39,7 @@ async function activate(context) {
         vscode.window.registerTreeDataProvider('gitfocal.branches', branchesProvider),
         vscode.window.registerTreeDataProvider('gitfocal.stashes', stashesProvider),
         vscode.window.registerTreeDataProvider('gitfocal.tags', tagsProvider),
+        vscode.workspace.registerTextDocumentContentProvider(STASH_CONTENT_SCHEME, stashDiffContentProvider),
         vscode.window.registerFileDecorationProvider(branchDecorationProvider)
     );
 

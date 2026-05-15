@@ -226,9 +226,7 @@ class GitService {
     }
 
     async getStashFiles(repoPath, stashId) {
-        const out = await this.exec(repoPath, [
-            'stash', 'show', '--name-status', stashId
-        ], { allowFailure: true });
+        const out = await this.getStashNameStatus(repoPath, stashId);
 
         const files = [];
         const lines = out.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -241,15 +239,61 @@ class GitService {
             }
             const status = parts[0].trim();
             const head = (status || '').charAt(0);
+            const originalPath = ((head === 'R' || head === 'C') && parts.length >= 3
+                ? parts[1]
+                : undefined);
             const filePath = ((head === 'R' || head === 'C') && parts.length >= 3
                 ? parts[2]
                 : parts[1]).trim();
             if (!filePath) {
                 continue;
             }
-            files.push({ status, path: filePath });
+            files.push({ status, path: filePath, originalPath });
         }
         return files;
+    }
+
+    async getStashNameStatus(repoPath, stashId) {
+        try {
+            return await this.exec(repoPath, [
+                'stash', 'show', '--name-status', '--include-untracked', stashId
+            ]);
+        } catch (err) {
+            if (!isUnsupportedStashShowOption(err)) {
+                throw err;
+            }
+            return this.exec(repoPath, [
+                'stash', 'show', '--name-status', stashId
+            ]);
+        }
+    }
+
+    async getStashPatch(repoPath, stashId) {
+        try {
+            return await this.exec(repoPath, [
+                'stash', 'show', '--patch', '--stat', '--include-untracked', stashId
+            ]);
+        } catch (err) {
+            if (!isUnsupportedStashShowOption(err)) {
+                throw err;
+            }
+            return this.exec(repoPath, [
+                'stash', 'show', '--patch', '--stat', stashId
+            ]);
+        }
+    }
+
+    async getStashFileContent(repoPath, stashId, filePath, side, originalPath) {
+        const targetPath = side === 'left' && originalPath ? originalPath : filePath;
+        const revisions = side === 'left' ? [`${stashId}^1`] : [stashId, `${stashId}^3`];
+        for (const revision of revisions) {
+            try {
+                return await this.exec(repoPath, ['show', `${revision}:${targetPath}`]);
+            } catch {
+                // Missing paths are represented as empty documents in VS Code's diff editor.
+            }
+        }
+        return '';
     }
 
     async getWorkTrees(repoPath) {
@@ -806,6 +850,11 @@ class GitService {
         await this.exec(repoPath, ['push', remote, '--delete', `refs/tags/${name}`]);
         this.invalidateRemoteTagCache(repoPath, remote);
     }
+}
+
+function isUnsupportedStashShowOption(err) {
+    const detail = err instanceof Error ? `${err.message}\n${err.stderr || ''}` : String(err || '');
+    return /include-untracked|unknown option/i.test(detail);
 }
 
 function parseAheadBehind(track) {
