@@ -5,6 +5,7 @@ const { pickRepo, reportGitError, withProgress } = require('./commandHelpers');
 const preferences = require('../models/preferences');
 
 const CONTEXT_BRANCHES_HIDE_SUBMODULES = 'gitfocal.branches.hideSubmodules';
+const CONTEXT_BRANCHES_HIDE_REMOTES = 'gitfocal.branches.hideRemotes';
 const CONTEXT_STASHES_HIDE_SUBMODULES = 'gitfocal.stashes.hideSubmodules';
 
 function registerTopCommands(ctx) {
@@ -122,6 +123,16 @@ function registerTopCommands(ctx) {
         vscode.commands.registerCommand('gitfocal.branches.hideSubmodules', async () => {
             await preferences.setBranchesHideSubmodules(true);
             void vscode.commands.executeCommand('setContext', CONTEXT_BRANCHES_HIDE_SUBMODULES, true);
+        }),
+
+        vscode.commands.registerCommand('gitfocal.branches.showRemotes', async () => {
+            await preferences.setBranchesHideRemotes(false);
+            void vscode.commands.executeCommand('setContext', CONTEXT_BRANCHES_HIDE_REMOTES, false);
+        }),
+
+        vscode.commands.registerCommand('gitfocal.branches.hideRemotes', async () => {
+            await preferences.setBranchesHideRemotes(true);
+            void vscode.commands.executeCommand('setContext', CONTEXT_BRANCHES_HIDE_REMOTES, true);
         }),
 
         vscode.commands.registerCommand('gitfocal.stashes.toggleHideSubmodules', async () => {

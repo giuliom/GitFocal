@@ -18,6 +18,7 @@ const preferences = require('./models/preferences');
 async function activate(context) {
     preferences.init(context);
     void vscode.commands.executeCommand('setContext', 'gitfocal.branches.hideSubmodules', preferences.getBranchesHideSubmodules());
+    void vscode.commands.executeCommand('setContext', 'gitfocal.branches.hideRemotes', preferences.getBranchesHideRemotes());
     void vscode.commands.executeCommand('setContext', 'gitfocal.stashes.hideSubmodules', preferences.getStashesHideSubmodules());
     const git = new GitService();
     const stateManager = new StateManager(git);

@@ -31,6 +31,9 @@ function branchStatus(branch) {
 }
 
 function colorForBranch(branch) {
+    if (branch.isRemote) {
+        return undefined;
+    }
     switch (branchStatus(branch)) {
         case 'no-upstream':    return new vscode.ThemeColor('gitDecoration.untrackedResourceForeground');
         case 'upstream-gone': return new vscode.ThemeColor('gitfocal.upstreamGoneForeground');

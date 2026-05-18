@@ -26,7 +26,7 @@ class BranchesTreeProvider {
                 this._onDidChangeTreeData.fire();
             }),
             preferences.onDidChange(e => {
-                if (e.key === preferences.KEY_BRANCHES_HIDE_SUBMODULES) {
+                if (e.key === preferences.KEY_BRANCHES_HIDE_SUBMODULES || e.key === preferences.KEY_BRANCHES_HIDE_REMOTES) {
                     this._onDidChangeTreeData.fire();
                 }
             })
@@ -84,7 +84,7 @@ class BranchesTreeProvider {
             }
             case 'branch': {
                 const branch = element.branch;
-                const item = new vscode.TreeItem(branch.name, vscode.TreeItemCollapsibleState.Collapsed);
+                const item = new vscode.TreeItem(element.label || branch.name, vscode.TreeItemCollapsibleState.Collapsed);
                 item.iconPath = new vscode.ThemeIcon(iconNameForBranch(branch), colorForBranch(branch));
                 item.description = formatBranchDescription(branch);
                 item.tooltip = buildBranchTooltip(branch);
@@ -168,6 +168,9 @@ class BranchesTreeProvider {
                     return this.buildLocalBranches(state);
                 }
                 if (element.groupKey === 'remote') {
+                    if (preferences.getBranchesHideRemotes()) {
+                        return [];
+                    }
                     return this.buildRemoteGroups(state);
                 }
                 if (element.groupKey === 'worktrees') {
@@ -177,13 +180,18 @@ class BranchesTreeProvider {
             }
             case 'remoteGroup': {
                 const state = this.stateManager.getState(element.repoPath);
-                if (!state) {
+                if (!state || preferences.getBranchesHideRemotes()) {
                     return [];
                 }
                 return state.branches
                     .filter(b => b.isRemote && b.remoteName === element.remoteName)
                     .sort((a, b) => a.name.localeCompare(b.name))
-                    .map(b => ({ kind: 'branch', label: b.name, repoPath: state.repoPath, branch: b }));
+                    .map(b => ({
+                        kind: 'branch',
+                        label: b.remoteName ? b.name.substring(b.remoteName.length + 1) : b.name,
+                        repoPath: state.repoPath,
+                        branch: b
+                    }));
             }
             case 'workTree': {
                 const state = this.stateManager.getState(element.repoPath);
@@ -212,6 +220,9 @@ class BranchesTreeProvider {
 
     buildRepoChildren(state) {
         const children = this.buildLocalBranches(state);
+        if (!preferences.getBranchesHideRemotes() && this.buildRemoteGroups(state).length > 0) {
+            children.push({ kind: 'group', label: 'Remotes', repoPath: state.repoPath, groupKey: 'remote' });
+        }
         if (state.workTrees.length > 1) {
             children.push({ kind: 'group', label: 'Worktrees', repoPath: state.repoPath, groupKey: 'worktrees' });
         }

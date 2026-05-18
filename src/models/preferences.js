@@ -4,6 +4,7 @@ const vscode = require('vscode');
 
 const KEY_LEGACY_HIDE_SUBMODULES = 'gitfocal.hideSubmodules';
 const KEY_BRANCHES_HIDE_SUBMODULES = 'gitfocal.branches.hideSubmodules';
+const KEY_BRANCHES_HIDE_REMOTES = 'gitfocal.branches.hideRemotes';
 const KEY_STASHES_HIDE_SUBMODULES = 'gitfocal.stashes.hideSubmodules';
 
 let _ctx;
@@ -17,12 +18,20 @@ function getBranchesHideSubmodules() {
     return getBoolean(KEY_BRANCHES_HIDE_SUBMODULES, getBoolean(KEY_LEGACY_HIDE_SUBMODULES, false));
 }
 
+function getBranchesHideRemotes() {
+    return getBoolean(KEY_BRANCHES_HIDE_REMOTES, false);
+}
+
 function getStashesHideSubmodules() {
     return getBoolean(KEY_STASHES_HIDE_SUBMODULES, false);
 }
 
 async function setBranchesHideSubmodules(value) {
     await setBoolean(KEY_BRANCHES_HIDE_SUBMODULES, value);
+}
+
+async function setBranchesHideRemotes(value) {
+    await setBoolean(KEY_BRANCHES_HIDE_REMOTES, value);
 }
 
 async function setStashesHideSubmodules(value) {
@@ -32,6 +41,12 @@ async function setStashesHideSubmodules(value) {
 async function toggleBranchesHideSubmodules() {
     const next = !getBranchesHideSubmodules();
     await setBranchesHideSubmodules(next);
+    return next;
+}
+
+async function toggleBranchesHideRemotes() {
+    const next = !getBranchesHideRemotes();
+    await setBranchesHideRemotes(next);
     return next;
 }
 
@@ -55,13 +70,17 @@ const onDidChange = _emitter.event;
 
 module.exports = {
     KEY_BRANCHES_HIDE_SUBMODULES,
+    KEY_BRANCHES_HIDE_REMOTES,
     KEY_STASHES_HIDE_SUBMODULES,
     init,
     getBranchesHideSubmodules,
+    getBranchesHideRemotes,
     getStashesHideSubmodules,
     setBranchesHideSubmodules,
+    setBranchesHideRemotes,
     setStashesHideSubmodules,
     toggleBranchesHideSubmodules,
+    toggleBranchesHideRemotes,
     toggleStashesHideSubmodules,
     onDidChange
 };
