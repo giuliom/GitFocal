@@ -3,6 +3,8 @@
 const path = require('path');
 const vscode = require('vscode');
 const { Icons } = require('../ui/icons');
+const { tagUri } = require('../ui/tagDecorationProvider');
+const tagsFilter = require('../models/tagsFilter');
 
 class TagsTreeProvider {
     constructor(stateManager) {
@@ -13,6 +15,9 @@ class TagsTreeProvider {
 
         this.disposables.push(
             this.stateManager.onDidChange(() => this._onDidChangeTreeData.fire())
+        );
+        this.disposables.push(
+            tagsFilter.onDidChange(() => this._onDidChangeTreeData.fire())
         );
     }
 
@@ -42,7 +47,12 @@ class TagsTreeProvider {
         }
         const tag = element.tag;
         const item = new vscode.TreeItem(tag.name, vscode.TreeItemCollapsibleState.None);
-        item.iconPath = tag.isAnnotated ? Icons.tagAnnotated : Icons.tag;
+        if (tag.isRemoteOnly) {
+            item.iconPath = new vscode.ThemeIcon('cloud');
+        } else {
+            item.iconPath = tag.isAnnotated ? Icons.tagAnnotated : Icons.tag;
+        }
+        item.resourceUri = tagUri(element.repoPath, tag.name);
         const parts = [];
         if (tag.commitHash) {
             parts.push(tag.commitHash);
@@ -56,7 +66,9 @@ class TagsTreeProvider {
         }
         item.description = parts.join(' \u2022 ');
         item.tooltip = buildTagTooltip(tag);
-        item.contextValue = tag.canPushTag ? 'tag.pushable' : 'tag.synced';
+        item.contextValue = tag.isRemoteOnly
+            ? 'tag.remoteOnly'
+            : (tag.canPushTag ? 'tag.pushable' : 'tag.synced');
         return item;
     }
 
@@ -86,9 +98,13 @@ class TagsTreeProvider {
     }
 
     buildTags(state) {
-        const tags = state.tags || [];
+        const all = state.tags || [];
+        const filter = tagsFilter.get().toLowerCase();
+        const tags = filter
+            ? all.filter(t => t.name.toLowerCase().includes(filter))
+            : all;
         if (tags.length === 0) {
-            return [{ kind: 'empty', label: 'No tags' }];
+            return [{ kind: 'empty', label: filter ? 'No tags match filter' : 'No tags' }];
         }
         return tags.map(t => ({
             kind: 'tag',
@@ -134,6 +150,8 @@ function formatOriginStatus(tag) {
                 : 'different commit on origin';
         case 'missing':
             return 'not on origin';
+        case 'remote-only':
+            return 'only on origin';
         case 'no-origin':
             return 'no origin remote';
         case 'no-remote':

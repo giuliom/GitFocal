@@ -426,6 +426,15 @@ class GitService {
         return out.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     }
 
+    async getRemoteUrl(repoPath, remote) {
+        const out = await this.exec(repoPath, ['remote', 'get-url', '--end-of-options', remote]);
+        return out.split(/\r?\n/)[0].trim();
+    }
+
+    async addRemote(repoPath, name, url) {
+        await this.exec(repoPath, ['remote', 'add', '--end-of-options', name, url]);
+    }
+
     async getRemoteTags(repoPath, remote) {
         const normalizedRepoPath = normalizeFsPath(repoPath);
         const cacheKey = `${normalizedRepoPath}::${remote}`;
@@ -782,7 +791,7 @@ class GitService {
             }));
         }
 
-        return tags.map(tag => {
+        const result = tags.map(tag => {
             const remoteTag = remoteTags.get(tag.name);
             if (!remoteTag) {
                 return {
@@ -804,6 +813,28 @@ class GitService {
                 canPushTag: !sameCommit
             };
         });
+
+        const localNames = new Set(tags.map(t => t.name));
+        for (const [name, rt] of remoteTags) {
+            if (localNames.has(name)) {
+                continue;
+            }
+            const commitHashFull = rt.commitHashFull || rt.objectHashFull || '';
+            result.push({
+                name,
+                refName: `refs/tags/${name}`,
+                isAnnotated: !!rt.commitHashFull,
+                commitHash: commitHashFull ? commitHashFull.substring(0, 7) : '',
+                commitHashFull,
+                originStatus: 'remote-only',
+                originCommitHashFull: commitHashFull || undefined,
+                originCommitHash: commitHashFull ? commitHashFull.substring(0, 7) : undefined,
+                canPushTag: false,
+                isRemoteOnly: true
+            });
+        }
+
+        return result;
     }
 
     async createTag(repoPath, name, options) {

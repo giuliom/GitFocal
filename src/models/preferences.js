@@ -4,7 +4,7 @@ const vscode = require('vscode');
 
 const KEY_LEGACY_HIDE_SUBMODULES = 'gitfocal.hideSubmodules';
 const KEY_BRANCHES_HIDE_SUBMODULES = 'gitfocal.branches.hideSubmodules';
-const KEY_BRANCHES_HIDE_REMOTES = 'gitfocal.branches.hideRemotes';
+const KEY_REMOTES_HIDE_SUBMODULES = 'gitfocal.remotes.hideSubmodules';
 const KEY_STASHES_HIDE_SUBMODULES = 'gitfocal.stashes.hideSubmodules';
 
 let _ctx;
@@ -18,8 +18,8 @@ function getBranchesHideSubmodules() {
     return getBoolean(KEY_BRANCHES_HIDE_SUBMODULES, getBoolean(KEY_LEGACY_HIDE_SUBMODULES, false));
 }
 
-function getBranchesHideRemotes() {
-    return getBoolean(KEY_BRANCHES_HIDE_REMOTES, false);
+function getRemotesHideSubmodules() {
+    return getBoolean(KEY_REMOTES_HIDE_SUBMODULES, getBoolean(KEY_LEGACY_HIDE_SUBMODULES, false));
 }
 
 function getStashesHideSubmodules() {
@@ -30,8 +30,8 @@ async function setBranchesHideSubmodules(value) {
     await setBoolean(KEY_BRANCHES_HIDE_SUBMODULES, value);
 }
 
-async function setBranchesHideRemotes(value) {
-    await setBoolean(KEY_BRANCHES_HIDE_REMOTES, value);
+async function setRemotesHideSubmodules(value) {
+    await setBoolean(KEY_REMOTES_HIDE_SUBMODULES, value);
 }
 
 async function setStashesHideSubmodules(value) {
@@ -44,9 +44,9 @@ async function toggleBranchesHideSubmodules() {
     return next;
 }
 
-async function toggleBranchesHideRemotes() {
-    const next = !getBranchesHideRemotes();
-    await setBranchesHideRemotes(next);
+async function toggleRemotesHideSubmodules() {
+    const next = !getRemotesHideSubmodules();
+    await setRemotesHideSubmodules(next);
     return next;
 }
 
@@ -70,17 +70,17 @@ const onDidChange = _emitter.event;
 
 module.exports = {
     KEY_BRANCHES_HIDE_SUBMODULES,
-    KEY_BRANCHES_HIDE_REMOTES,
+    KEY_REMOTES_HIDE_SUBMODULES,
     KEY_STASHES_HIDE_SUBMODULES,
     init,
     getBranchesHideSubmodules,
-    getBranchesHideRemotes,
+    getRemotesHideSubmodules,
     getStashesHideSubmodules,
     setBranchesHideSubmodules,
-    setBranchesHideRemotes,
+    setRemotesHideSubmodules,
     setStashesHideSubmodules,
     toggleBranchesHideSubmodules,
-    toggleBranchesHideRemotes,
+    toggleRemotesHideSubmodules,
     toggleStashesHideSubmodules,
     onDidChange
 };

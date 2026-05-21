@@ -348,8 +348,65 @@ function registerBranchCommands(ctx) {
             } catch (err) {
                 reportGitError(err, `Failed to rename ${resolved.branchName}`);
             }
+        }),
+
+        vscode.commands.registerCommand('gitfocal.remotes.checkout', async (arg) => {
+            const node = remoteBranchNode(arg);
+            if (!node) {
+                return;
+            }
+            const branchName = node.branch.name;
+            const slash = branchName.indexOf('/');
+            const suggested = slash >= 0 ? branchName.substring(slash + 1) : branchName;
+            const localName = await vscode.window.showInputBox({
+                prompt: `Local branch name for ${branchName}`,
+                value: suggested,
+                validateInput: v => v && v.trim() && !/\s/.test(v) ? null : 'Enter a non-empty name without spaces'
+            });
+            if (!localName) {
+                return;
+            }
+            try {
+                await withProgress(`Checkout ${branchName}`,
+                    () => git.checkoutRemoteAsLocal(node.repoPath, branchName, localName.trim()));
+                await stateManager.refresh(node.repoPath);
+            } catch (err) {
+                reportGitError(err, `Failed to checkout ${branchName}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('gitfocal.remotes.createLocalFrom', async (arg) => {
+            const node = remoteBranchNode(arg);
+            if (!node) {
+                return;
+            }
+            const branchName = node.branch.name;
+            const slash = branchName.indexOf('/');
+            const suggested = slash >= 0 ? branchName.substring(slash + 1) : branchName;
+            const localName = await vscode.window.showInputBox({
+                prompt: `New local branch from ${branchName}`,
+                value: suggested,
+                validateInput: v => v && v.trim() && !/\s/.test(v) ? null : 'Enter a non-empty name without spaces'
+            });
+            if (!localName) {
+                return;
+            }
+            try {
+                await withProgress(`Create branch ${localName.trim()}`,
+                    () => git.createBranch(node.repoPath, localName.trim(), branchName));
+                await stateManager.refresh(node.repoPath);
+            } catch (err) {
+                reportGitError(err, `Failed to create branch from ${branchName}`);
+            }
         })
     ];
+}
+
+function remoteBranchNode(arg) {
+    if (!arg || typeof arg !== 'object' || arg.kind !== 'branch' || !arg.branch || !arg.branch.isRemote) {
+        return undefined;
+    }
+    return arg;
 }
 
 async function deleteBranch(ctx, arg, force) {

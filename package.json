@@ -2,7 +2,7 @@
   "name": "gitfocal",
   "displayName": "GitFocal",
   "description": "Lightweight Git branches & stashes views for VS Code with zero dependencies.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "gitfocal",
   "repository": {
     "type": "git",
@@ -17,6 +17,7 @@
   ],
   "activationEvents": [
     "onView:gitfocal.branches",
+    "onView:gitfocal.remotes",
     "onView:gitfocal.stashes",
     "onView:gitfocal.tags",
     "onStartupFinished"
@@ -40,6 +41,7 @@
     "views": {
       "scm": [
         { "id": "gitfocal.branches", "name": "Branches" },
+        { "id": "gitfocal.remotes", "name": "Remotes" },
         { "id": "gitfocal.stashes", "name": "Stashes" },
         { "id": "gitfocal.tags", "name": "Tags" }
       ]
@@ -47,13 +49,25 @@
     "commands": [
       { "command": "gitfocal.refresh", "title": "GitFocal: Refresh", "icon": "$(refresh)" },
       { "command": "gitfocal.createBranch", "title": "GitFocal: Create Branch", "icon": "$(add)" },
+      { "command": "gitfocal.checkoutRemoteBranch", "title": "GitFocal: Checkout Remote Branch", "icon": "$(git-branch)" },
       { "command": "gitfocal.fetchAll", "title": "GitFocal: Fetch All", "icon": "$(cloud-download)" },
       { "command": "gitfocal.stashChanges", "title": "GitFocal: Stash Changes", "icon": "$(archive)" },
       { "command": "gitfocal.branches.toggleHideSubmodules", "title": "GitFocal: Toggle Hide Submodules in Branches" },
       { "command": "gitfocal.branches.hideSubmodules", "title": "GitFocal: Hide Branch Submodules", "icon": "$(eye)" },
       { "command": "gitfocal.branches.showSubmodules", "title": "GitFocal: Show Branch Submodules", "icon": "$(eye-closed)" },
-      { "command": "gitfocal.branches.hideRemotes", "title": "GitFocal: Hide Remote Branches", "icon": "$(eye)" },
-      { "command": "gitfocal.branches.showRemotes", "title": "GitFocal: Show Remote Branches", "icon": "$(eye-closed)" },
+      { "command": "gitfocal.remotes.checkout", "title": "Checkout as Local Branch", "icon": "$(check)" },
+      { "command": "gitfocal.remotes.createLocalFrom", "title": "Create Local Branch From...", "icon": "$(repo-create)" },
+      { "command": "gitfocal.remotes.filter", "title": "GitFocal: Filter Remote Branches", "icon": "$(filter)" },
+      { "command": "gitfocal.remotes.clearFilter", "title": "GitFocal: Clear Remote Branches Filter", "icon": "$(filter-filled)" },
+      { "command": "gitfocal.remotes.toggleHideSubmodules", "title": "GitFocal: Toggle Hide Submodules in Remotes" },
+      { "command": "gitfocal.remotes.hideSubmodules", "title": "GitFocal: Hide Remote Submodules", "icon": "$(eye)" },
+      { "command": "gitfocal.remotes.showSubmodules", "title": "GitFocal: Show Remote Submodules", "icon": "$(eye-closed)" },
+      { "command": "gitfocal.remotes.loadMoreCommits", "title": "Load More Commits" },
+      { "command": "gitfocal.remotes.add", "title": "GitFocal: Add Remote", "icon": "$(add)" },
+      { "command": "gitfocal.remotes.copyName", "title": "Copy Remote Name" },
+      { "command": "gitfocal.remotes.copyUrl", "title": "Copy Remote URL" },
+      { "command": "gitfocal.tags.filter", "title": "GitFocal: Filter Tags", "icon": "$(filter)" },
+      { "command": "gitfocal.tags.clearFilter", "title": "GitFocal: Clear Tags Filter", "icon": "$(filter-filled)" },
       { "command": "gitfocal.stashes.toggleHideSubmodules", "title": "GitFocal: Toggle Hide Submodules in Stashes" },
       { "command": "gitfocal.stashes.hideSubmodules", "title": "GitFocal: Hide Stash Submodules", "icon": "$(eye)" },
       { "command": "gitfocal.stashes.showSubmodules", "title": "GitFocal: Show Stash Submodules", "icon": "$(eye-closed)" },
@@ -109,14 +123,21 @@
         { "command": "gitfocal.refresh", "when": "view == gitfocal.branches", "group": "navigation@3" },
         { "command": "gitfocal.branches.hideSubmodules", "when": "view == gitfocal.branches && !gitfocal.branches.hideSubmodules", "group": "2_visibility@1" },
         { "command": "gitfocal.branches.showSubmodules", "when": "view == gitfocal.branches && gitfocal.branches.hideSubmodules", "group": "2_visibility@1" },
-        { "command": "gitfocal.branches.hideRemotes", "when": "view == gitfocal.branches && !gitfocal.branches.hideRemotes", "group": "2_visibility@2" },
-        { "command": "gitfocal.branches.showRemotes", "when": "view == gitfocal.branches && gitfocal.branches.hideRemotes", "group": "2_visibility@2" },
+        { "command": "gitfocal.remotes.add", "when": "view == gitfocal.remotes", "group": "navigation@1" },
+        { "command": "gitfocal.fetchAll", "when": "view == gitfocal.remotes", "group": "navigation@2" },
+        { "command": "gitfocal.refresh", "when": "view == gitfocal.remotes", "group": "navigation@3" },
+        { "command": "gitfocal.remotes.filter", "when": "view == gitfocal.remotes && !gitfocal.remotes.hasFilter", "group": "navigation@4" },
+        { "command": "gitfocal.remotes.clearFilter", "when": "view == gitfocal.remotes && gitfocal.remotes.hasFilter", "group": "navigation@4" },
+        { "command": "gitfocal.remotes.hideSubmodules", "when": "view == gitfocal.remotes && !gitfocal.remotes.hideSubmodules", "group": "navigation@5" },
+        { "command": "gitfocal.remotes.showSubmodules", "when": "view == gitfocal.remotes && gitfocal.remotes.hideSubmodules", "group": "navigation@5" },
         { "command": "gitfocal.stashChanges", "when": "view == gitfocal.stashes", "group": "navigation@1" },
         { "command": "gitfocal.refresh", "when": "view == gitfocal.stashes", "group": "navigation@2" },
         { "command": "gitfocal.stashes.hideSubmodules", "when": "view == gitfocal.stashes && !gitfocal.stashes.hideSubmodules", "group": "navigation@3" },
         { "command": "gitfocal.stashes.showSubmodules", "when": "view == gitfocal.stashes && gitfocal.stashes.hideSubmodules", "group": "navigation@3" },
         { "command": "gitfocal.createTag", "when": "view == gitfocal.tags", "group": "navigation@1" },
-        { "command": "gitfocal.refresh", "when": "view == gitfocal.tags", "group": "navigation@2" }
+        { "command": "gitfocal.refresh", "when": "view == gitfocal.tags", "group": "navigation@2" },
+        { "command": "gitfocal.tags.filter", "when": "view == gitfocal.tags && !gitfocal.tags.hasFilter", "group": "navigation@3" },
+        { "command": "gitfocal.tags.clearFilter", "when": "view == gitfocal.tags && gitfocal.tags.hasFilter", "group": "navigation@3" }
       ],
       "view/item/context": [
         { "command": "gitfocal.checkoutBranch", "when": "view == gitfocal.branches && viewItem =~ /^branch\\./", "group": "inline@1" },
@@ -167,6 +188,27 @@
 
         { "command": "gitfocal.tagCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "inline@0" },
         { "command": "gitfocal.tagCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "1_commit@2" },
+
+        { "command": "gitfocal.remotes.checkout", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "inline@1" },
+        { "command": "gitfocal.remotes.createLocalFrom", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "inline@2" },
+        { "command": "gitfocal.fetch", "when": "view == gitfocal.remotes && viewItem == remote", "group": "inline@1" },
+        { "command": "gitfocal.remotes.checkout", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "1_checkout@1" },
+        { "command": "gitfocal.remotes.createLocalFrom", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "1_checkout@2" },
+        { "command": "gitfocal.merge", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "2_history@1" },
+        { "command": "gitfocal.rebase", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "2_history@2" },
+        { "command": "gitfocal.copyName", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "9_copy@1" },
+        { "command": "gitfocal.copyCommitHash", "when": "view == gitfocal.remotes && viewItem == remoteBranch", "group": "9_copy@2" },
+        { "command": "gitfocal.fetch", "when": "view == gitfocal.remotes && viewItem == remote", "group": "1_remote@1" },
+        { "command": "gitfocal.remotes.copyName", "when": "view == gitfocal.remotes && viewItem == remote", "group": "9_copy@1" },
+        { "command": "gitfocal.remotes.copyUrl", "when": "view == gitfocal.remotes && viewItem == remote", "group": "9_copy@2" },
+
+        { "command": "gitfocal.tagCommit", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "inline@0" },
+        { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "inline@1" },
+        { "command": "gitfocal.copyCommit", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "inline@2" },
+        { "command": "gitfocal.tagCommit", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "1_commit@2" },
+        { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "1_commit@1" },
+        { "command": "gitfocal.reset", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "3_history@1" },
+        { "command": "gitfocal.copyCommit", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "9_copy@1" },
 
         { "command": "gitfocal.checkoutTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "inline@1" },
         { "command": "gitfocal.pushTag", "when": "view == gitfocal.tags && viewItem == tag.pushable", "group": "inline@2" },
@@ -224,8 +266,13 @@
         { "command": "gitfocal.renameBranch", "when": "false" },
         { "command": "gitfocal.branches.hideSubmodules", "when": "false" },
         { "command": "gitfocal.branches.showSubmodules", "when": "false" },
-        { "command": "gitfocal.branches.hideRemotes", "when": "false" },
-        { "command": "gitfocal.branches.showRemotes", "when": "false" },
+        { "command": "gitfocal.remotes.checkout", "when": "false" },
+        { "command": "gitfocal.remotes.createLocalFrom", "when": "false" },
+        { "command": "gitfocal.remotes.copyName", "when": "false" },
+        { "command": "gitfocal.remotes.copyUrl", "when": "false" },
+        { "command": "gitfocal.remotes.hideSubmodules", "when": "false" },
+        { "command": "gitfocal.remotes.showSubmodules", "when": "false" },
+        { "command": "gitfocal.remotes.loadMoreCommits", "when": "false" },
         { "command": "gitfocal.stashes.hideSubmodules", "when": "false" },
         { "command": "gitfocal.stashes.showSubmodules", "when": "false" },
         { "command": "gitfocal.deleteTag", "when": "false" },
@@ -239,8 +286,8 @@
       ]
     },
     "keybindings": [
-      { "command": "gitfocal.refresh", "key": "ctrl+alt+r", "mac": "cmd+alt+r", "when": "focusedView == gitfocal.branches || focusedView == gitfocal.stashes || focusedView == gitfocal.tags" },
-      { "command": "gitfocal.fetchAll", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "focusedView == gitfocal.branches" }
+      { "command": "gitfocal.refresh", "key": "ctrl+alt+r", "mac": "cmd+alt+r", "when": "focusedView == gitfocal.branches || focusedView == gitfocal.remotes || focusedView == gitfocal.stashes || focusedView == gitfocal.tags" },
+      { "command": "gitfocal.fetchAll", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "focusedView == gitfocal.branches || focusedView == gitfocal.remotes" }
     ],
     "configuration": {
       "title": "GitFocal",
