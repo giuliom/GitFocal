@@ -19,7 +19,7 @@ function colorForTag(tag) {
         case 'missing':
             return new vscode.ThemeColor('gitDecoration.untrackedResourceForeground');
         case 'different':
-            return new vscode.ThemeColor('charts.orange');
+            return new vscode.ThemeColor('charts.yellow');
         default:
             return undefined;
     }
