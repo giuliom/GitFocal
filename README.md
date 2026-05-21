@@ -6,10 +6,10 @@
 
 <img src="assets/icon.png" alt="GitFocal icon" width="128" />
 
-A no-frills Visual Studio Code extension for Git. GitFocal adds three focused views to the Source Control sidebar: **Branches**, **Stashes**, and **Tags**. It shells out to your local `git`, keeps runtime dependencies at zero, and is written in JavaScript.
+A no-frills Visual Studio Code extension for Git. GitFocal adds four focused views to the Source Control sidebar: **Branches**, **Remotes**, **Stashes**, and **Tags**. It shells out to your local `git`, keeps runtime dependencies at zero, and is written in JavaScript.
 
 
-<img src="assets/screenshot.png" alt="GitFocal icon" width="512" />
+<img src="assets/screenshot.png" alt="GitFocal screenshot" width="512" />
 
 ## Features
 
@@ -23,25 +23,36 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds three focused vi
 - Commit actions: cherry-pick, create tag at commit, copy commit hash
 - Toggle to hide submodule repositories from the Branches view
 
+### Remotes view
+
+- Groups remote-tracking branches by remote and shows recent commits for each branch
+- Filter remote branches by name from the view title
+- Checkout a remote branch as a new local branch or create a local branch from it
+- Fetch a specific remote, add remotes, and copy remote names or URLs
+- Branch actions include merge, rebase, cherry-pick, reset, tag-at-commit, and copy commit hash
+- Toggle to hide submodule repositories from the Remotes view
+
 ### Stashes view
 
 - Lists stashes per repository and expands each stash to show changed files
-- Apply, pop, rename, and delete stashes
+- Open diffs, apply, pop, rename, and delete stashes
 - Restore an individual file from a stash
-- Stash changes from the view title or stash all / staged / unstaged changes from SCM resource menus
+- Stash changes from the view title or stash all / staged / unstaged / selected changes from SCM resource menus
 - Toggle to hide submodule repositories from the Stashes view
 
 ### Tags view
 
 - Lists tags per repository with commit/date details, annotated-tag indicator, and origin sync status
+- Filter tags by name from the view title
 - Create lightweight or annotated tags at `HEAD`, another ref, or directly from a branch commit
 - Checkout, rename, delete, and delete remote tags
 - Push tags when they are missing on `origin` or point to a different commit there; matching tags are shown as already synced
 - Copy tag name or tagged commit hash
 
-### Top-level behavior
+### Shared behavior
 
-- View title commands for refresh, create branch, stash changes, create tag, and fetch all repositories
+- View title commands for refresh, create branch, add remote, stash changes, create tag, and fetch all repositories
+- Focused refresh and fetch-all keybindings for the SCM views
 - Auto-fetch on a configurable interval (default 5 min)
 - Auto-detects `git` or accepts an explicit path via `gitfocal.gitPath`
 
@@ -103,20 +114,18 @@ code --install-extension build/gitfocal-<version>.vsix
 ```
 src/
   extension.js              # activation entry point
-  commands/                 # command handlers
+  commands/                 # command handlers for tree items and view titles
   git/                      # git CLI wrapper + types
   models/                   # state, preferences, repository state
-  providers/                # tree data providers (branches, stashes)
-  ui/                       # icons, decorations
-  utils/                    # debounce, git path resolver
+  providers/                # tree data providers (branches, remotes, stashes, tags)
+  ui/                       # icons and decorations
+  utils/                    # debounce, git path resolver, repo filters
 ```
 
 ## TODO
 
 - [ ] Better support for worktrees and submodules
-- [ ] Diff viewer integration for stashes
 - [ ] Group local branches by prefix (`feature/`, `fix/`, …)
-- [ ] Optional remote branches view (currently hidden)
 - [ ] Unit tests for `gitService` and providers
 - [ ] Publish to the VS Code Marketplace
 
