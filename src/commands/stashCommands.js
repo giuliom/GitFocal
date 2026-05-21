@@ -141,7 +141,10 @@ function registerStashCommands(ctx) {
             }
             try {
                 await withProgress(`Restore ${arg.file.path} from ${arg.stash.id}`,
-                    () => git.stashApplyFile(arg.repoPath, arg.stash.id, arg.file.path));
+                    () => git.stashApplyFile(arg.repoPath, arg.stash.id, arg.file.path, {
+                        status: arg.file.status,
+                        originalPath: arg.file.originalPath
+                    }));
                 await stateManager.refresh(arg.repoPath);
             } catch (err) {
                 reportGitError(err, `Failed to restore ${arg.file.path} from ${arg.stash.id}`);

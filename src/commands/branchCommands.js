@@ -73,11 +73,15 @@ function registerBranchCommands(ctx) {
         }),
 
         vscode.commands.registerCommand('gitfocal.fetch', async (arg) => {
-            const repo = await pickRepo(stateManager, isBranchNode(arg) ? arg.repoPath : undefined);
+            const remoteNode = isRemoteNode(arg) ? arg : undefined;
+            const preferredPath = isBranchNode(arg) || remoteNode ? arg.repoPath : undefined;
+            const repo = await pickRepo(stateManager, preferredPath);
             if (!repo) {
                 return;
             }
-            const remote = isBranchNode(arg) && arg.branch && arg.branch.remoteName ? arg.branch.remoteName : undefined;
+            const remote = remoteNode
+                ? remoteNode.remoteName
+                : (isBranchNode(arg) && arg.branch && arg.branch.remoteName ? arg.branch.remoteName : undefined);
             try {
                 await withProgress(remote ? `Fetch ${remote}` : 'Fetch all remotes',
                     () => git.fetchRemote(repo.repoPath, remote));
@@ -407,6 +411,10 @@ function remoteBranchNode(arg) {
         return undefined;
     }
     return arg;
+}
+
+function isRemoteNode(arg) {
+    return !!arg && typeof arg === 'object' && arg.kind === 'remote' && !!arg.remoteName;
 }
 
 async function deleteBranch(ctx, arg, force) {

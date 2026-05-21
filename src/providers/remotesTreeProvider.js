@@ -154,7 +154,7 @@ class RemotesTreeProvider {
             return [{ kind: 'empty', label: 'No remotes' }];
         }
         const filter = remotesFilter.get();
-        return Array.from(grouped.keys()).sort().map(name => {
+        const remotes = Array.from(grouped.keys()).sort().map(name => {
             const branches = grouped.get(name);
             const visible = filter
                 ? branches.filter(b => matchesFilter(b, name, filter))
@@ -167,6 +167,10 @@ class RemotesTreeProvider {
                 branchCount: visible.length
             };
         });
+        const visibleRemotes = filter ? remotes.filter(remote => remote.branchCount > 0) : remotes;
+        return visibleRemotes.length > 0
+            ? visibleRemotes
+            : [{ kind: 'empty', label: 'No matches' }];
     }
 
     buildBranches(state, remoteName) {

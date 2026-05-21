@@ -40,10 +40,10 @@
     "viewsContainers": {},
     "views": {
       "scm": [
-        { "id": "gitfocal.branches", "name": "Branches" },
-        { "id": "gitfocal.remotes", "name": "Remotes" },
-        { "id": "gitfocal.stashes", "name": "Stashes" },
-        { "id": "gitfocal.tags", "name": "Tags" }
+        { "id": "gitfocal.branches", "name": "Branches", "icon": "assets/icon.png" },
+        { "id": "gitfocal.remotes", "name": "Remotes", "icon": "assets/icon.png" },
+        { "id": "gitfocal.stashes", "name": "Stashes", "icon": "assets/icon.png" },
+        { "id": "gitfocal.tags", "name": "Tags", "icon": "assets/icon.png" }
       ]
     },
     "commands": [
@@ -210,14 +210,14 @@
         { "command": "gitfocal.reset", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "3_history@1" },
         { "command": "gitfocal.copyCommit", "when": "view == gitfocal.remotes && viewItem =~ /^commit/", "group": "9_copy@1" },
 
-        { "command": "gitfocal.checkoutTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "inline@1" },
+        { "command": "gitfocal.checkoutTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\.(pushable|synced)$/", "group": "inline@1" },
         { "command": "gitfocal.pushTag", "when": "view == gitfocal.tags && viewItem == tag.pushable", "group": "inline@2" },
-        { "command": "gitfocal.deleteTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "inline@3" },
-        { "command": "gitfocal.checkoutTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "1_tag@1" },
+        { "command": "gitfocal.deleteTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\.(pushable|synced)$/", "group": "inline@3" },
+        { "command": "gitfocal.checkoutTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\.(pushable|synced)$/", "group": "1_tag@1" },
         { "command": "gitfocal.pushTag", "when": "view == gitfocal.tags && viewItem == tag.pushable", "group": "2_remote@1" },
         { "command": "gitfocal.deleteRemoteTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "2_remote@2" },
-        { "command": "gitfocal.renameTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "7_modify@1" },
-        { "command": "gitfocal.deleteTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "8_delete@1" },
+        { "command": "gitfocal.renameTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\.(pushable|synced)$/", "group": "7_modify@1" },
+        { "command": "gitfocal.deleteTag", "when": "view == gitfocal.tags && viewItem =~ /^tag\\.(pushable|synced)$/", "group": "8_delete@1" },
         { "command": "gitfocal.copyTagName", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "9_copy@1" },
         { "command": "gitfocal.copyTagCommitHash", "when": "view == gitfocal.tags && viewItem =~ /^tag\\./", "group": "9_copy@2" }
       ],

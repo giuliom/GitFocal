@@ -577,8 +577,10 @@ class GitService {
             const args = ['stash', 'push', '-u'];
             if (message) args.push('-m', message);
             args.push('--', ...paths);
+            let selectedStashed = false;
             try {
-                await this.exec(repoPath, args);
+                const out = await this.exec(repoPath, args);
+                selectedStashed = !/no local changes to save/i.test(out || '');
             } catch (err) {
                 // The selected paths may have no changes (e.g. user picked a
                 // file that wasn't actually modified). Treat that as a no-op
@@ -587,6 +589,12 @@ class GitService {
                 if (!/no local changes to save/i.test(msg)) {
                     throw err;
                 }
+            }
+            if (tempStashed) {
+                // If the selected stash was a no-op, the temporary stash is still
+                // at stash@{0}. Otherwise the selected stash pushed it to stash@{1}.
+                await this.exec(repoPath, ['stash', 'pop', '--index', selectedStashed ? 'stash@{1}' : 'stash@{0}']);
+                tempStashed = false;
             }
         } catch (err) {
             if (tempStashed) {
@@ -598,11 +606,6 @@ class GitService {
                 }
             }
             throw err;
-        }
-
-        if (tempStashed) {
-            // After step 2 the temp stash is at index 1 (selected stash at 0).
-            await this.exec(repoPath, ['stash', 'pop', '--index', 'stash@{1}']);
         }
     }
 
@@ -630,6 +633,11 @@ class GitService {
         return paths;
     }
 
+    async getUnstagedTrackedPaths(repoPath) {
+        const out = await this.exec(repoPath, ['diff', '--name-only', '-z', '--']);
+        return out.split('\0').filter(Boolean);
+    }
+
     async stashAllChanges(repoPath, message) {
         const args = ['stash', 'push', '-u'];
         if (message) {
@@ -647,27 +655,60 @@ class GitService {
     }
 
     async stashUnstagedChanges(repoPath, message) {
-        // Use `--keep-index`: stash all changes (staged + unstaged) but reset the
-        // working tree to match the index afterwards. The net effect is that only
-        // the unstaged work is removed from the working tree, while staged hunks
-        // remain intact in the index. This is the standard git idiom for "stash
-        // only the unstaged changes" and correctly handles files that have both
-        // staged and unstaged hunks (which a path-based `git stash push -- <path>`
-        // would silently stash in full, dropping the user's staged work).
-        const args = ['stash', 'push', '--keep-index'];
-        if (message) {
-            args.push('-m', message);
+        const unstagedPaths = await this.getUnstagedTrackedPaths(repoPath);
+        if (unstagedPaths.length === 0) {
+            return;
         }
-        await this.exec(repoPath, args);
+
+        const stashMessage = message && message.trim() ? message.trim() : 'Unstaged changes';
+        const fullStashSha = (await this.exec(repoPath, ['stash', 'create', stashMessage])).trim();
+        if (!fullStashSha) {
+            return;
+        }
+
+        const indexCopySha = (await this.exec(repoPath, [
+            'commit-tree', `${fullStashSha}^2^{tree}`, '-p', 'HEAD', '-m', 'gitfocal: index snapshot'
+        ])).trim();
+        if (!indexCopySha) {
+            throw new GitError('Could not create index snapshot for unstaged stash', 'git commit-tree', '');
+        }
+
+        const unstagedStashSha = (await this.exec(repoPath, [
+            'commit-tree', `${fullStashSha}^{tree}`, '-p', `${fullStashSha}^2`, '-p', indexCopySha, '-m', stashMessage
+        ])).trim();
+        if (!unstagedStashSha) {
+            throw new GitError('Could not create unstaged stash commit', 'git commit-tree', '');
+        }
+
+        await this.exec(repoPath, ['stash', 'store', '-m', stashMessage, unstagedStashSha]);
+        await this.exec(repoPath, ['checkout', '--', ...unstagedPaths]);
     }
 
     async stashApply(repoPath, id) {
         await this.exec(repoPath, ['stash', 'apply', id]);
     }
 
-    async stashApplyFile(repoPath, id, filePath) {
-        // Restore a single file from the stash into the working tree.
-        await this.exec(repoPath, ['checkout', id, '--', filePath]);
+    async stashApplyFile(repoPath, id, filePath, options) {
+        const opts = options || {};
+        const statusKind = (opts.status || '').charAt(0);
+        if (statusKind === 'R' && opts.originalPath && opts.originalPath !== filePath) {
+            await this.exec(repoPath, ['rm', '--ignore-unmatch', '--', opts.originalPath]);
+        }
+        if (statusKind === 'D') {
+            await this.exec(repoPath, ['rm', '--ignore-unmatch', '--', filePath]);
+            return;
+        }
+        const revisions = [id, `${id}^3`];
+        let lastErr;
+        for (const revision of revisions) {
+            try {
+                await this.exec(repoPath, ['checkout', revision, '--', filePath]);
+                return;
+            } catch (err) {
+                lastErr = err;
+            }
+        }
+        throw lastErr;
     }
 
     async stashPop(repoPath, id) {

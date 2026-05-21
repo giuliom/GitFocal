@@ -24,10 +24,15 @@ function getOverwriteTagPrompt(name, ref, existingTag) {
     return `Tag '${name}' already exists${currentTarget}. Overwrite it${replacementTarget}?`;
 }
 
-async function resolveTagNode(stateManager, arg) {
+async function resolveTagNode(stateManager, arg, options) {
+    const opts = options || {};
     if (isTagNode(arg) && arg.tag) {
         const state = stateManager.getState(arg.repoPath);
         if (state) {
+            if (opts.localOnly && arg.tag.isRemoteOnly) {
+                void vscode.window.showInformationMessage(`GitFocal: tag '${arg.tag.name}' only exists on the remote.`);
+                return undefined;
+            }
             return { state, tag: arg.tag };
         }
     }
@@ -35,9 +40,13 @@ async function resolveTagNode(stateManager, arg) {
     if (!repo) {
         return undefined;
     }
-    const tags = repo.tags || [];
+    const tags = opts.localOnly
+        ? (repo.tags || []).filter(tag => !tag.isRemoteOnly)
+        : (repo.tags || []);
     if (tags.length === 0) {
-        void vscode.window.showInformationMessage('GitFocal: no tags in this repository.');
+        void vscode.window.showInformationMessage(opts.localOnly
+            ? 'GitFocal: no local tags in this repository.'
+            : 'GitFocal: no tags in this repository.');
         return undefined;
     }
     const pick = await vscode.window.showQuickPick(
@@ -167,7 +176,7 @@ function registerTagCommands(ctx) {
         }),
 
         vscode.commands.registerCommand('gitfocal.deleteTag', async (arg) => {
-            const resolved = await resolveTagNode(stateManager, arg);
+            const resolved = await resolveTagNode(stateManager, arg, { localOnly: true });
             if (!resolved) {
                 return;
             }
@@ -186,15 +195,24 @@ function registerTagCommands(ctx) {
         }),
 
         vscode.commands.registerCommand('gitfocal.renameTag', async (arg) => {
-            const resolved = await resolveTagNode(stateManager, arg);
+            const resolved = await resolveTagNode(stateManager, arg, { localOnly: true });
             if (!resolved) {
                 return;
             }
             const { state, tag } = resolved;
+            const existingLocalTags = (state.tags || [])
+                .filter(candidate => !candidate.isRemoteOnly && candidate.name !== tag.name)
+                .map(candidate => candidate.name);
             const newName = await vscode.window.showInputBox({
                 prompt: `Rename tag '${tag.name}' to`,
                 value: tag.name,
-                validateInput: v => v && v.trim() && !/\s/.test(v) && v.trim() !== tag.name ? null : 'Enter a new non-empty name without spaces'
+                validateInput: v => {
+                    const trimmed = v && v.trim();
+                    if (!trimmed || /\s/.test(trimmed) || trimmed === tag.name) {
+                        return 'Enter a new non-empty name without spaces';
+                    }
+                    return existingLocalTags.includes(trimmed) ? `Tag '${trimmed}' already exists` : null;
+                }
             });
             if (!newName) {
                 return;
@@ -209,7 +227,7 @@ function registerTagCommands(ctx) {
         }),
 
         vscode.commands.registerCommand('gitfocal.checkoutTag', async (arg) => {
-            const resolved = await resolveTagNode(stateManager, arg);
+            const resolved = await resolveTagNode(stateManager, arg, { localOnly: true });
             if (!resolved) {
                 return;
             }
