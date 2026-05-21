@@ -6,8 +6,9 @@
   "publisher": "gitfocal",
   "repository": {
     "type": "git",
-    "url": "https://github.com/giuliom/GitFocal.git"
+    "url": "https://github.com/giuliom/GitFocal"
   },
+  "homepage": "https://github.com/giuliom/GitFocal",
   "engines": {
     "vscode": "^1.74.0"
   },
