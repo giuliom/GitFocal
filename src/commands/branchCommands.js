@@ -329,6 +329,29 @@ function registerBranchCommands(ctx) {
             }
         }),
 
+        vscode.commands.registerCommand('gitfocal.revertCommit', async (arg) => {
+            if (!arg || arg.kind !== 'commit' || !arg.commit) {
+                return;
+            }
+            const repo = await pickRepo(stateManager, arg.repoPath);
+            if (!repo) {
+                return;
+            }
+            const short = arg.commit.shortHash || arg.commit.hash.substring(0, 7);
+            const subject = arg.commit.subject ? ` "${arg.commit.subject}"` : '';
+            const ok = await confirm(`Revert ${short}${subject} on current branch? A new commit undoing its changes will be created.`, 'Revert');
+            if (!ok) {
+                return;
+            }
+            try {
+                await withProgress(`Revert ${short}`,
+                    () => git.revertCommit(repo.repoPath, arg.commit.hash));
+                await stateManager.refresh(repo.repoPath);
+            } catch (err) {
+                reportGitError(err, `Failed to revert ${short}`);
+            }
+        }),
+
         vscode.commands.registerCommand('gitfocal.renameBranch', async (arg) => {
             const resolved = await resolveBranchNode(stateManager, arg, {
                 localOnly: true,

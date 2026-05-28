@@ -378,6 +378,10 @@ class GitService {
         await this.exec(repoPath, ['cherry-pick', '--end-of-options', hash]);
     }
 
+    async revertCommit(repoPath, hash) {
+        await this.exec(repoPath, ['revert', '--no-edit', '--end-of-options', hash]);
+    }
+
     async fetchRemote(repoPath, remote) {
         const args = ['fetch'];
         if (remote) {
