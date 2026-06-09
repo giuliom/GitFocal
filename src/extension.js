@@ -69,7 +69,9 @@ async function activate(context) {
         })
     );
 
-    await stateManager.initialize();
+    // Initialize in the background so activation doesn't block on scanning
+    // every repository; views fire change events as state arrives.
+    void stateManager.initialize();
 }
 
 function deactivate() {

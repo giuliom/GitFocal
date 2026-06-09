@@ -6,6 +6,7 @@ const { Icons, iconNameForBranch } = require('../ui/icons');
 const { formatBranchDescription, colorForBranch } = require('../ui/decorations');
 const { branchUri } = require('../ui/branchDecorationProvider');
 const preferences = require('../models/preferences');
+const branchesFilter = require('../models/branchesFilter');
 const { filterSubmoduleStates, isSameOrDescendantPath } = require('../utils/repoFilters');
 
 const INITIAL_COMMITS_PER_BRANCH = 5;
@@ -27,6 +28,12 @@ class BranchesTreeProvider {
             }),
             preferences.onDidChange(e => {
                 if (e.key === preferences.KEY_BRANCHES_HIDE_SUBMODULES) {
+                    this._onDidChangeTreeData.fire();
+                }
+            }),
+            branchesFilter.onDidChange(() => this._onDidChangeTreeData.fire()),
+            vscode.workspace.onDidChangeConfiguration(e => {
+                if (e.affectsConfiguration('gitfocal.checkoutOnClick') || e.affectsConfiguration('gitfocal.branches.sortBy')) {
                     this._onDidChangeTreeData.fire();
                 }
             })
@@ -55,9 +62,7 @@ class BranchesTreeProvider {
             }
             case 'group': {
                 const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.Expanded);
-                item.iconPath = element.groupKey === 'local'
-                    ? Icons.localGroup
-                    : Icons.workTreeGroup;
+                item.iconPath = Icons.workTreeGroup;
                 item.contextValue = `group.${element.groupKey}`;
                 return item;
             }
@@ -68,6 +73,13 @@ class BranchesTreeProvider {
                 item.contextValue = 'workTree';
                 item.description = wt && wt.isMain ? '(main)' : undefined;
                 item.tooltip = wt ? wt.path : undefined;
+                return item;
+            }
+            case 'detachedHead': {
+                const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
+                item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
+                item.contextValue = 'detachedHead';
+                item.tooltip = 'HEAD is not on any branch. Checkout a branch to resume normal work.';
                 return item;
             }
             case 'branch': {
@@ -85,11 +97,13 @@ class BranchesTreeProvider {
                 } else {
                     item.contextValue = 'branch.local' + trackingSuffix;
                 }
-                item.command = {
-                    command: 'gitfocal.checkoutBranch',
-                    title: 'Checkout',
-                    arguments: [element]
-                };
+                if (vscode.workspace.getConfiguration('gitfocal').get('checkoutOnClick', true)) {
+                    item.command = {
+                        command: 'gitfocal.checkoutBranch',
+                        title: 'Checkout',
+                        arguments: [element]
+                    };
+                }
                 return item;
             }
             case 'commit': {
@@ -152,9 +166,6 @@ class BranchesTreeProvider {
                 if (!state) {
                     return [];
                 }
-                if (element.groupKey === 'local') {
-                    return this.buildLocalBranches(state);
-                }
                 if (element.groupKey === 'worktrees') {
                     return this.buildWorkTrees(state);
                 }
@@ -187,6 +198,13 @@ class BranchesTreeProvider {
 
     buildRepoChildren(state) {
         const children = this.buildLocalBranches(state);
+        if (state.detachedCommit) {
+            children.unshift({
+                kind: 'detachedHead',
+                label: `Detached HEAD at ${state.detachedCommit}`,
+                repoPath: state.repoPath
+            });
+        }
         if (state.workTrees.length > 1) {
             children.push({ kind: 'group', label: 'Worktrees', repoPath: state.repoPath, groupKey: 'worktrees' });
         }
@@ -195,15 +213,20 @@ class BranchesTreeProvider {
 
     buildLocalBranches(state) {
         const hideSubmodules = preferences.getBranchesHideSubmodules();
+        const filter = branchesFilter.get().toLowerCase();
+        const sortBy = vscode.workspace.getConfiguration('gitfocal').get('branches.sortBy', 'name');
 
         let local = state.branches.filter(b => !b.isRemote);
         if (hideSubmodules) {
             local = local.filter(b => !b.workTreePath || isSameOrDescendantPath(state.repoPath, b.workTreePath));
         }
-        return local
-            .slice()
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map(b => ({ kind: 'branch', label: b.name, repoPath: state.repoPath, branch: b }));
+        if (filter) {
+            local = local.filter(b => b.name.toLowerCase().includes(filter));
+        }
+        const sorted = local.slice().sort(sortBy === 'commitDate'
+            ? (a, b) => (b.committerDate || 0) - (a.committerDate || 0) || a.name.localeCompare(b.name)
+            : (a, b) => a.name.localeCompare(b.name));
+        return sorted.map(b => ({ kind: 'branch', label: b.name, repoPath: state.repoPath, branch: b }));
     }
 
     buildWorkTrees(state) {

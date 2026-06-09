@@ -16,9 +16,12 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds four focused vie
 ### Branches view
 
 - Lists local branches with current-branch indicator, ahead/behind counts, and upstream info
+- Filter branches by name and sort by name or most recent commit
+- Shows a warning entry when HEAD is detached
 - Worktrees are grouped when more than one is present
 - Expanding a branch shows recent commits
 - Inline actions: checkout, fetch, pull, push, publish branch, reset current branch
+- Pull offers rebase/merge when branches have diverged; push offers force-with-lease when rejected
 - Context menu: create from, rename, delete (with force), merge, rebase, squash, reset, change upstream, copy branch name/upstream/commit hash
 - Commit actions: cherry-pick, revert, create tag at commit, copy commit hash
 - Toggle to hide submodule repositories from the Branches view
@@ -47,14 +50,19 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds four focused vie
 - Create lightweight or annotated tags at `HEAD`, another ref, or directly from a branch commit
 - Checkout, rename, delete, and delete remote tags
 - Push tags when they are missing on `origin` or point to a different commit there; matching tags are shown as already synced
+- Push all tags to a remote and fetch tags from the view title menu
 - Copy tag name or tagged commit hash
 
 ### Shared behavior
 
 - View title commands for refresh, create branch, add remote, stash changes, create tag, and fetch all repositories
 - Focused refresh and fetch-all keybindings for the SCM views
-- Auto-fetch on a configurable interval (default 5 min)
+- Auto-fetch on a configurable interval (default 5 min); paused while the window is unfocused
 - Auto-detects `git` or accepts an explicit path via `gitfocal.gitPath`
+
+## Requirements
+
+- `git` 2.24 or newer (2.35+ for *Stash Staged Changes*)
 
 ## Configuration
 
@@ -63,6 +71,8 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds four focused vie
 | `gitfocal.refreshDebounceMs` | `500` | Debounce delay (ms) for filesystem-watcher refreshes |
 | `gitfocal.autoFetchIntervalMinutes` | `5` | Interval for `git fetch --all --prune`. `0` disables |
 | `gitfocal.gitPath` | `""` | Optional explicit path to the `git` executable |
+| `gitfocal.checkoutOnClick` | `true` | Checkout a branch on single click in the Branches view. Disable to require the inline button or context menu |
+| `gitfocal.branches.sortBy` | `"name"` | Sort local branches by `name` or `commitDate` (most recent first) |
 
 ## Keybindings
 

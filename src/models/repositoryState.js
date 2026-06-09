@@ -8,6 +8,8 @@ function createRepositoryState(init) {
         workTrees: Object.freeze([...init.workTrees]),
         tags: Object.freeze([...(init.tags || [])]),
         currentBranch: init.currentBranch,
+        // Short hash HEAD points at when detached, otherwise undefined.
+        detachedCommit: init.detachedCommit,
         lastRefreshed: init.lastRefreshed != null ? init.lastRefreshed : Date.now(),
         version: init.version != null ? init.version : 1,
         error: init.error

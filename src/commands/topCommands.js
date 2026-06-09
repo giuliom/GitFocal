@@ -3,6 +3,7 @@
 const vscode = require('vscode');
 const { pickRepo, reportGitError, withProgress } = require('./commandHelpers');
 const preferences = require('../models/preferences');
+const branchesFilter = require('../models/branchesFilter');
 const remotesFilter = require('../models/remotesFilter');
 const tagsFilter = require('../models/tagsFilter');
 
@@ -15,6 +16,11 @@ function registerTopCommands(ctx) {
 
     return [
         vscode.commands.registerCommand('gitfocal.refresh', async () => {
+            // Manual refresh should bypass the remote tag cache so origin
+            // sync status is re-checked.
+            for (const s of stateManager.getStates()) {
+                git.invalidateRemoteTagCache(s.repoPath);
+            }
             await stateManager.refresh();
         }),
 
@@ -183,6 +189,22 @@ function registerTopCommands(ctx) {
 
         vscode.commands.registerCommand('gitfocal.remotes.clearFilter', () => {
             remotesFilter.clear();
+        }),
+
+        vscode.commands.registerCommand('gitfocal.branches.filter', async () => {
+            const value = await vscode.window.showInputBox({
+                prompt: 'Filter local branches by name (leave empty to clear)',
+                placeHolder: 'substring match on branch name',
+                value: branchesFilter.get()
+            });
+            if (value === undefined) {
+                return;
+            }
+            branchesFilter.set(value);
+        }),
+
+        vscode.commands.registerCommand('gitfocal.branches.clearFilter', () => {
+            branchesFilter.clear();
         }),
 
         vscode.commands.registerCommand('gitfocal.tags.filter', async () => {

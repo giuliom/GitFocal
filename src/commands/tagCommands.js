@@ -335,6 +335,50 @@ function registerTagCommands(ctx) {
             if (hash) {
                 await vscode.env.clipboard.writeText(hash);
             }
+        }),
+
+        vscode.commands.registerCommand('gitfocal.pushAllTags', async () => {
+            const repo = await pickRepo(stateManager);
+            if (!repo) {
+                return;
+            }
+            const remotes = await git.listRemotes(repo.repoPath).catch(() => []);
+            if (remotes.length === 0) {
+                void vscode.window.showInformationMessage('GitFocal: no remotes configured.');
+                return;
+            }
+            let remote = remotes.includes('origin') ? 'origin' : remotes[0];
+            if (remotes.length > 1) {
+                const pick = await vscode.window.showQuickPick(remotes, { placeHolder: 'Push all tags to remote' });
+                if (!pick) {
+                    return;
+                }
+                remote = pick;
+            }
+            const ok = await confirm(`Push all local tags to '${remote}'?`, 'Push Tags');
+            if (!ok) {
+                return;
+            }
+            try {
+                await withProgress(`Push all tags to ${remote}`, () =>
+                    git.pushAllTags(repo.repoPath, remote));
+                await stateManager.refresh(repo.repoPath);
+            } catch (err) {
+                reportGitError(err, `Failed to push tags to ${remote}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('gitfocal.fetchTags', async () => {
+            const repo = await pickRepo(stateManager);
+            if (!repo) {
+                return;
+            }
+            try {
+                await withProgress('Fetch tags', () => git.fetchTags(repo.repoPath));
+                await stateManager.refresh(repo.repoPath);
+            } catch (err) {
+                reportGitError(err, 'Failed to fetch tags');
+            }
         })
     ];
 }

@@ -203,6 +203,11 @@ class StateManager {
         }
         const intervalMs = minutes * 60 * 1000;
         entry.autoFetchTimer = setInterval(() => {
+            // Skip background fetches while the window is unfocused to avoid
+            // needless network traffic; the next focused tick catches up.
+            if (!vscode.window.state.focused) {
+                return;
+            }
             void this.autoFetch(repoRoot);
         }, intervalMs);
     }
@@ -324,6 +329,10 @@ class StateManager {
                 this.git.getTags(repoPath).catch(() => []),
                 this.git.getCurrentBranch(repoPath).catch(() => '')
             ]);
+            // `rev-parse --abbrev-ref HEAD` prints the literal "HEAD" when detached.
+            const detachedCommit = currentBranch === 'HEAD'
+                ? await this.git.getHeadCommit(repoPath).catch(() => undefined)
+                : undefined;
             entry.state = createRepositoryState({
                 repoPath,
                 branches,
@@ -331,6 +340,7 @@ class StateManager {
                 workTrees,
                 tags,
                 currentBranch,
+                detachedCommit,
                 version: entry.state.version + 1
             });
             this._onDidChange.fire(entry.state);
@@ -343,6 +353,7 @@ class StateManager {
                 workTrees: entry.state.workTrees,
                 tags: entry.state.tags,
                 currentBranch: entry.state.currentBranch,
+                detachedCommit: entry.state.detachedCommit,
                 version: entry.state.version + 1,
                 error: message
             });

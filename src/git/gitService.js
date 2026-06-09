@@ -6,7 +6,10 @@ const { GitError } = require('./gitTypes');
 const { resolveGitPath } = require('../utils/gitPathResolver');
 const { normalizeFsPath } = require('../utils/pathUtils');
 
-const REMOTE_TAG_CACHE_TTL_MS = 30 * 1000;
+// Remote tag status is only consulted for display. Keep it cached for a
+// while so watcher-driven refreshes don't hammer the network; fetch and
+// tag push/delete operations invalidate it explicitly.
+const REMOTE_TAG_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Direct git CLI wrapper. Uses only Node.js built-ins (`child_process`).
@@ -20,10 +23,14 @@ class GitService {
     async exec(repoPath, args, opts) {
         const options = opts || {};
         const gitPath = await resolveGitPath();
+        // core.quotepath=false keeps non-ASCII file names literal instead of
+        // quoted/escaped octal, which would break path parsing (e.g. in
+        // `stash show --name-status`).
+        const fullArgs = ['-c', 'core.quotepath=false', ...args];
         return new Promise((resolve, reject) => {
             execFile(
                 gitPath,
-                args,
+                fullArgs,
                 {
                     cwd: repoPath,
                     maxBuffer: options.maxBuffer || 50 * 1024 * 1024,
@@ -73,6 +80,12 @@ class GitService {
         return out.trim();
     }
 
+    /** Returns the short hash HEAD points at (used for detached HEAD display). */
+    async getHeadCommit(repoPath) {
+        const out = await this.exec(repoPath, ['rev-parse', '--short', 'HEAD']);
+        return out.trim();
+    }
+
     async getBranches(repoPath) {
         const SEP = '\x1f';
         const REC = '\x1e';
@@ -84,7 +97,8 @@ class GitService {
             '%(objectname:short)',
             '%(upstream:short)',
             '%(upstream:track)',
-            '%(contents:subject)'
+            '%(contents:subject)',
+            '%(committerdate:unix)'
         ].join(SEP) + REC;
 
         const out = await this.exec(repoPath, [
@@ -110,6 +124,7 @@ class GitService {
             const upstream = fields[5] || undefined;
             const track = fields[6] || '';
             const subject = fields[7] || undefined;
+            const committerDate = parseInt(fields[8], 10) || 0;
 
             const isRemote = refName.startsWith('refs/remotes/');
             if (isRemote && shortName.endsWith('/HEAD')) {
@@ -134,6 +149,7 @@ class GitService {
                 commitHash,
                 commitHashFull,
                 commitSubject: subject,
+                committerDate,
                 remoteName
             });
         }
@@ -171,8 +187,13 @@ class GitService {
             const reflogSubject = fields[1] || '';
             const subject = fields[2] || '';
 
-            const indexMatch = id.match(/stash@\{(\d+)\}/);
-            const index = indexMatch ? parseInt(indexMatch[1], 10) : 0;
+            // `allowFailure` can hand us stderr text; only accept records that
+            // actually look like stash entries.
+            const indexMatch = id.match(/^stash@\{(\d+)\}$/);
+            if (!indexMatch) {
+                continue;
+            }
+            const index = parseInt(indexMatch[1], 10);
 
             let branch;
             const m = reflogSubject.match(/^(?:WIP )?[Oo]n ([^:]+):/);
@@ -391,19 +412,61 @@ class GitService {
         }
         args.push('--prune');
         await this.exec(repoPath, args);
+        this.invalidateRemoteTagCache(repoPath, remote);
     }
 
-    async pull(repoPath) {
-        await this.exec(repoPath, ['pull', '--ff-only']);
-    }
-
-    async push(repoPath, setUpstream, branchName) {
-        const args = ['push'];
-        if (setUpstream) {
-            const branch = branchName || await this.getCurrentBranch(repoPath);
-            args.push('-u', 'origin', branch);
+    /**
+     * Pull the current branch. `mode` is 'ff-only' (default), 'rebase', or
+     * 'merge'. The caller decides how to recover from divergence.
+     */
+    async pull(repoPath, mode) {
+        const args = ['pull'];
+        if (mode === 'rebase') {
+            args.push('--rebase');
+        } else if (mode === 'merge') {
+            args.push('--no-rebase');
+        } else {
+            args.push('--ff-only');
         }
         await this.exec(repoPath, args);
+    }
+
+    async push(repoPath, setUpstream, branchName, options) {
+        const opts = options || {};
+        const args = ['push'];
+        if (opts.forceWithLease) {
+            args.push('--force-with-lease');
+        }
+        if (setUpstream) {
+            const branch = branchName || await this.getCurrentBranch(repoPath);
+            const remotes = await this.listRemotes(repoPath);
+            const remote = remotes.includes('origin') ? 'origin' : remotes[0];
+            if (!remote) {
+                throw new GitError('No remotes configured', 'git push', '');
+            }
+            args.push('-u', remote, branch);
+        }
+        await this.exec(repoPath, args);
+    }
+
+    /** Push a specific local branch to its upstream's remote. */
+    async pushBranch(repoPath, remote, localBranch, remoteBranch, options) {
+        const opts = options || {};
+        const args = ['push'];
+        if (opts.forceWithLease) {
+            args.push('--force-with-lease');
+        }
+        args.push('--end-of-options', remote, `${localBranch}:${remoteBranch || localBranch}`);
+        await this.exec(repoPath, args);
+    }
+
+    /**
+     * Fast-forward a local branch that is NOT checked out by fetching its
+     * upstream directly into the local ref. Git refuses non-fast-forward
+     * updates with this form, so it is safe.
+     */
+    async fastForwardBranch(repoPath, remote, remoteBranch, localBranch) {
+        await this.exec(repoPath, ['fetch', '--end-of-options', remote, `${remoteBranch}:${localBranch}`]);
     }
 
     async squashCommits(repoPath, count, message) {
@@ -655,7 +718,18 @@ class GitService {
         if (message) {
             args.push('-m', message);
         }
-        await this.exec(repoPath, args);
+        try {
+            await this.exec(repoPath, args);
+        } catch (err) {
+            const detail = err instanceof Error ? `${err.message}\n${err.stderr || ''}` : String(err || '');
+            if (/unknown option|--staged/i.test(detail)) {
+                throw new GitError(
+                    "'git stash push --staged' requires git 2.35 or newer. Update git to use this command.",
+                    'git stash push --staged', err && err.stderr ? err.stderr : ''
+                );
+            }
+            throw err;
+        }
     }
 
     async stashUnstagedChanges(repoPath, message) {
@@ -926,11 +1000,41 @@ class GitService {
         await this.exec(repoPath, ['push', remote, '--delete', `refs/tags/${name}`]);
         this.invalidateRemoteTagCache(repoPath, remote);
     }
+
+    /** Push every local tag to the given remote. */
+    async pushAllTags(repoPath, remote) {
+        await this.exec(repoPath, ['push', '--tags', '--end-of-options', remote]);
+        this.invalidateRemoteTagCache(repoPath, remote);
+    }
+
+    /** Fetch tags from the given remote (or all remotes when omitted). */
+    async fetchTags(repoPath, remote) {
+        const args = ['fetch', '--tags'];
+        if (remote) {
+            args.push(remote);
+        } else {
+            args.push('--all');
+        }
+        await this.exec(repoPath, args);
+        this.invalidateRemoteTagCache(repoPath, remote);
+    }
 }
 
 function isUnsupportedStashShowOption(err) {
     const detail = err instanceof Error ? `${err.message}\n${err.stderr || ''}` : String(err || '');
     return /include-untracked|unknown option/i.test(detail);
+}
+
+/** True when a `pull --ff-only` failed because local and remote diverged. */
+function isDivergentPullError(err) {
+    const detail = err instanceof Error ? `${err.message}\n${err.stderr || ''}` : String(err || '');
+    return /not possible to fast-forward|divergent branches|need to specify how to reconcile/i.test(detail);
+}
+
+/** True when a push was rejected because the remote has newer commits. */
+function isPushRejectedError(err) {
+    const detail = err instanceof Error ? `${err.message}\n${err.stderr || ''}` : String(err || '');
+    return /\[rejected\]|non-fast-forward|fetch first|failed to push some refs/i.test(detail);
 }
 
 function parseAheadBehind(track) {
@@ -949,4 +1053,4 @@ function parseAheadBehind(track) {
     return result;
 }
 
-module.exports = { GitService };
+module.exports = { GitService, isDivergentPullError, isPushRejectedError };

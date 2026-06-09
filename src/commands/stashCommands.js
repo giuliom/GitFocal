@@ -211,11 +211,17 @@ async function runScmStashSelected(ctx, arg, others) {
             continue;
         }
         const rel = path.relative(repoPath, fsPath);
-        if (!rel || seen.has(rel)) {
+        if (!rel) {
             continue;
         }
-        seen.add(rel);
-        paths.push(rel);
+        // Git pathspecs use forward slashes on all platforms; path.relative
+        // produces backslashes on Windows.
+        const relPosix = rel.split(path.sep).join('/');
+        if (seen.has(relPosix)) {
+            continue;
+        }
+        seen.add(relPosix);
+        paths.push(relPosix);
     }
     if (paths.length === 0) {
         void vscode.window.showWarningMessage('GitFocal: no files selected to stash.');

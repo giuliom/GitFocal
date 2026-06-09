@@ -1,6 +1,7 @@
 'use strict';
 
 const vscode = require('vscode');
+const { isDivergentPullError, isPushRejectedError } = require('../git/gitService');
 const {
     confirm,
     isBranchNode,
@@ -50,17 +51,19 @@ function registerBranchCommands(ctx) {
             }
             const fromBranch = isBranchNode(arg) && arg.branch ? arg.branch.name : undefined;
             const name = await vscode.window.showInputBox({
-                prompt: fromBranch ? `New branch name (from ${fromBranch})` : 'New branch name'
+                prompt: fromBranch ? `New branch name (from ${fromBranch})` : 'New branch name',
+                validateInput: v => v && v.trim() && !/\s/.test(v) ? null : 'Enter a non-empty name without spaces'
             });
             if (!name) {
                 return;
             }
+            const trimmedName = name.trim();
             try {
-                await withProgress(`Create branch ${name}`, () =>
-                    git.createBranch(repo.repoPath, name, fromBranch));
+                await withProgress(`Create branch ${trimmedName}`, () =>
+                    git.createBranch(repo.repoPath, trimmedName, fromBranch));
                 await stateManager.refresh(repo.repoPath);
             } catch (err) {
-                reportGitError(err, `Failed to create branch ${name}`);
+                reportGitError(err, `Failed to create branch ${trimmedName}`);
             }
         }),
 
@@ -96,10 +99,38 @@ function registerBranchCommands(ctx) {
             if (!repo) {
                 return;
             }
+            // When invoked on a non-current local branch with an upstream,
+            // fast-forward that branch directly instead of pulling whatever
+            // branch happens to be checked out.
+            const branch = isBranchNode(arg) && arg.branch && !arg.branch.isRemote ? arg.branch : undefined;
+            const upstream = branch && !branch.isCurrent && !branch.upstreamGone ? splitUpstream(branch.upstream) : undefined;
             try {
-                await withProgress('Pull', () => git.pull(repo.repoPath));
+                if (upstream) {
+                    await withProgress(`Update ${branch.name}`, () =>
+                        git.fastForwardBranch(repo.repoPath, upstream.remote, upstream.branch, branch.name));
+                } else {
+                    await withProgress('Pull', () => git.pull(repo.repoPath));
+                }
                 await stateManager.refresh(repo.repoPath);
             } catch (err) {
+                if (!upstream && isDivergentPullError(err)) {
+                    const choice = await vscode.window.showWarningMessage(
+                        'GitFocal: local and remote branches have diverged. How do you want to reconcile?',
+                        { modal: true },
+                        'Rebase', 'Merge'
+                    );
+                    if (!choice) {
+                        return;
+                    }
+                    try {
+                        await withProgress(`Pull (${choice.toLowerCase()})`,
+                            () => git.pull(repo.repoPath, choice === 'Rebase' ? 'rebase' : 'merge'));
+                        await stateManager.refresh(repo.repoPath);
+                    } catch (retryErr) {
+                        reportGitError(retryErr, 'Pull failed');
+                    }
+                    return;
+                }
                 reportGitError(err, 'Pull failed');
             }
         }),
@@ -109,10 +140,35 @@ function registerBranchCommands(ctx) {
             if (!repo) {
                 return;
             }
+            // Push the branch the command was invoked on, not whatever is
+            // currently checked out.
+            const branch = isBranchNode(arg) && arg.branch && !arg.branch.isRemote ? arg.branch : undefined;
+            const upstream = branch && !branch.isCurrent ? splitUpstream(branch.upstream) : undefined;
+            const doPush = (forceWithLease) => upstream
+                ? git.pushBranch(repo.repoPath, upstream.remote, branch.name, upstream.branch, { forceWithLease })
+                : git.push(repo.repoPath, false, undefined, { forceWithLease });
+            const label = upstream ? `Push ${branch.name}` : 'Push';
             try {
-                await withProgress('Push', () => git.push(repo.repoPath, false));
+                await withProgress(label, () => doPush(false));
                 await stateManager.refresh(repo.repoPath);
             } catch (err) {
+                if (isPushRejectedError(err)) {
+                    const choice = await vscode.window.showWarningMessage(
+                        'GitFocal: push was rejected because the remote has newer commits. Pull first, or overwrite the remote branch?',
+                        { modal: true },
+                        'Force Push (with lease)'
+                    );
+                    if (!choice) {
+                        return;
+                    }
+                    try {
+                        await withProgress(`${label} (force-with-lease)`, () => doPush(true));
+                        await stateManager.refresh(repo.repoPath);
+                    } catch (retryErr) {
+                        reportGitError(retryErr, 'Force push failed');
+                    }
+                    return;
+                }
                 reportGitError(err, 'Push failed');
             }
         }),
@@ -177,7 +233,10 @@ function registerBranchCommands(ctx) {
             const countStr = await vscode.window.showInputBox({
                 prompt: 'Number of commits to squash',
                 value: '2',
-                validateInput: v => /^[2-9]\d*$/.test(v.trim()) ? null : 'Enter an integer >= 2'
+                validateInput: v => {
+                    const t = v.trim();
+                    return /^\d+$/.test(t) && parseInt(t, 10) >= 2 ? null : 'Enter an integer >= 2';
+                }
             });
             if (!countStr) {
                 return;
@@ -438,6 +497,18 @@ function remoteBranchNode(arg) {
 
 function isRemoteNode(arg) {
     return !!arg && typeof arg === 'object' && arg.kind === 'remote' && !!arg.remoteName;
+}
+
+/** Split "origin/feature/x" into { remote: 'origin', branch: 'feature/x' }. */
+function splitUpstream(upstream) {
+    if (!upstream) {
+        return undefined;
+    }
+    const slash = upstream.indexOf('/');
+    if (slash <= 0) {
+        return undefined;
+    }
+    return { remote: upstream.substring(0, slash), branch: upstream.substring(slash + 1) };
 }
 
 async function deleteBranch(ctx, arg, force) {
