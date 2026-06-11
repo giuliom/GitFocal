@@ -42,7 +42,8 @@ function registerBranchCommands(ctx) {
                     const suggested = slash >= 0 ? branchName.substring(slash + 1) : branchName;
                     const localName = await vscode.window.showInputBox({
                         prompt: 'Local branch name',
-                        value: suggested
+                        value: suggested,
+                        validateInput: v => v && v.trim() && !/\s/.test(v) ? null : 'Enter a non-empty name without spaces'
                     });
                     if (!localName) {
                         return;
@@ -159,10 +160,18 @@ function registerBranchCommands(ctx) {
             // currently checked out.
             const branch = isBranchNode(arg) && arg.branch && !arg.branch.isRemote ? arg.branch : undefined;
             const upstream = branch && !branch.isCurrent ? splitUpstream(branch.upstream) : undefined;
-            const doPush = (forceWithLease) => upstream
-                ? git.pushBranch(repo.repoPath, upstream.remote, branch.name, upstream.branch, { forceWithLease })
-                : git.push(repo.repoPath, false, undefined, { forceWithLease });
-            const label = upstream ? `Push ${branch.name}` : 'Push';
+            const doPush = (forceWithLease) => {
+                if (upstream) {
+                    return git.pushBranch(repo.repoPath, upstream.remote, branch.name, upstream.branch, { forceWithLease });
+                }
+                if (branch && !branch.isCurrent) {
+                    // Non-current branch with no usable upstream: a bare
+                    // `git push` would push the checked-out branch instead.
+                    return git.push(repo.repoPath, true, branch.name, { forceWithLease });
+                }
+                return git.push(repo.repoPath, false, undefined, { forceWithLease });
+            };
+            const label = branch && !branch.isCurrent ? `Push ${branch.name}` : 'Push';
             try {
                 await withProgress(label, () => doPush(false));
                 await stateManager.refresh(repo.repoPath);

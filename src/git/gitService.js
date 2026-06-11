@@ -113,7 +113,7 @@ class GitService {
 
         for (const rec of records) {
             const fields = rec.split(SEP);
-            if (fields.length < 8) {
+            if (fields.length < 9) {
                 continue;
             }
             const refName = fields[0];
@@ -503,7 +503,7 @@ class GitService {
             if (!remote) {
                 throw new GitError('No remotes configured', 'git push', '');
             }
-            args.push('-u', remote, branch);
+            args.push('-u', '--end-of-options', remote, branch);
         }
         await this.exec(repoPath, args);
     }
@@ -1022,10 +1022,9 @@ class GitService {
             args.push('-f');
         }
         if (opts.message) {
-            args.push('-a', name, '-m', opts.message);
-        } else {
-            args.push(name);
+            args.push('-a', '-m', opts.message);
         }
+        args.push('--end-of-options', name);
         if (opts.ref) {
             args.push(opts.ref);
         }
