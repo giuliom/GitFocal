@@ -15,7 +15,7 @@
             "request": "launch",
             "runtimeArgs": [
                 "--test",
-                "${workspaceFolder}/test"
+                "${workspaceFolder}/test/**/*.test.cjs"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"

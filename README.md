@@ -93,7 +93,7 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds four focused vie
 Unit tests use Node's built-in test runner (`node:test`) with a stubbed `vscode` API — no test dependencies. They cover the git CLI output parsing, command construction, state management, tree providers, and utilities.
 
 ```sh
-node --test test/
+node --test "test/**/*.test.cjs"
 # or
 npm test
 ```
