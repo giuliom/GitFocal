@@ -8,6 +8,7 @@ const { branchUri } = require('../ui/branchDecorationProvider');
 const preferences = require('../models/preferences');
 const branchesFilter = require('../models/branchesFilter');
 const { filterSubmoduleStates, isSameOrDescendantPath } = require('../utils/repoFilters');
+const { pathsEqual } = require('../utils/pathUtils');
 
 const INITIAL_COMMITS_PER_BRANCH = 5;
 const COMMITS_PAGE_SIZE = 5;
@@ -70,9 +71,11 @@ class BranchesTreeProvider {
                 const wt = element.workTree;
                 const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.Collapsed);
                 item.iconPath = Icons.workTree;
-                item.contextValue = 'workTree';
-                item.description = wt && wt.isMain ? '(main)' : undefined;
-                item.tooltip = wt ? wt.path : undefined;
+                item.contextValue = wt.isMain
+                    ? 'workTree.main'
+                    : (wt.isLocked ? 'workTree.linked.locked' : 'workTree.linked');
+                item.description = formatWorkTreeDescription(wt, element.repoPath);
+                item.tooltip = buildWorkTreeTooltip(wt);
                 return item;
             }
             case 'detachedHead': {
@@ -94,6 +97,10 @@ class BranchesTreeProvider {
                     item.contextValue = 'branch.remote';
                 } else if (branch.isCurrent) {
                     item.contextValue = 'branch.current' + trackingSuffix;
+                } else if (branch.checkedOutInOtherWorktree) {
+                    // Busy in another worktree: menus swap checkout/delete for
+                    // "Open Worktree" via the `.worktree` marker.
+                    item.contextValue = 'branch.local.worktree' + trackingSuffix;
                 } else {
                     item.contextValue = 'branch.local' + trackingSuffix;
                 }
@@ -176,10 +183,18 @@ class BranchesTreeProvider {
                 if (!state) {
                     return [];
                 }
-                const wtPath = element.workTree.path;
-                return state.branches
-                    .filter(b => b.workTreePath === wtPath)
+                const wt = element.workTree;
+                const branchItems = state.branches
+                    .filter(b => !b.isRemote && b.workTreePath === wt.path)
                     .map(b => ({ kind: 'branch', label: b.name, repoPath: state.repoPath, branch: b }));
+                if (branchItems.length === 0 && wt.isDetached && wt.head) {
+                    return [{
+                        kind: 'detachedHead',
+                        label: `Detached HEAD at ${wt.head.substring(0, 7)}`,
+                        repoPath: state.repoPath
+                    }];
+                }
+                return branchItems;
             }
             case 'branch': {
                 return this.buildBranchCommits(element);
@@ -351,6 +366,57 @@ function buildTagsByCommit(state) {
         }
     }
     return map;
+}
+
+function formatWorkTreeDescription(wt, repoPath) {
+    const segments = [];
+    if (wt.branch) {
+        segments.push(wt.branch.replace(/^refs\/heads\//, ''));
+    } else if (wt.isDetached && wt.head) {
+        segments.push(`detached @ ${wt.head.substring(0, 7)}`);
+    }
+    const flags = [];
+    if (wt.isMain) {
+        flags.push('main');
+    }
+    if (pathsEqual(wt.path, repoPath)) {
+        flags.push('current');
+    }
+    if (wt.isBare) {
+        flags.push('bare');
+    }
+    if (wt.isLocked) {
+        flags.push('locked');
+    }
+    if (wt.isPrunable) {
+        flags.push('prunable');
+    }
+    if (flags.length > 0) {
+        segments.push(`(${flags.join(', ')})`);
+    }
+    return segments.join(' ');
+}
+
+function buildWorkTreeTooltip(wt) {
+    const md = new vscode.MarkdownString();
+    md.appendMarkdown(`**${path.basename(wt.path) || wt.path}**\n\n`);
+    md.appendMarkdown(`- path: \`${wt.path}\`\n`);
+    if (wt.branch) {
+        md.appendMarkdown(`- branch: \`${wt.branch.replace(/^refs\/heads\//, '')}\`\n`);
+    }
+    if (wt.head) {
+        md.appendMarkdown(`- HEAD: \`${wt.head.substring(0, 7)}\`\n`);
+    }
+    if (wt.isDetached) {
+        md.appendMarkdown(`- detached HEAD\n`);
+    }
+    if (wt.isLocked) {
+        md.appendMarkdown(`- locked${wt.lockedReason ? `: ${wt.lockedReason}` : ''}\n`);
+    }
+    if (wt.isPrunable) {
+        md.appendMarkdown(`- prunable (folder is missing)\n`);
+    }
+    return md;
 }
 
 function buildBranchTooltip(branch) {

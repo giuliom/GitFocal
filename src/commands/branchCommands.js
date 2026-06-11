@@ -21,6 +21,21 @@ function registerBranchCommands(ctx) {
                 return;
             }
             const { state, branchName, isRemote } = resolved;
+            if (!isRemote) {
+                // Git refuses to check out a branch that is active in another
+                // worktree; offer to open that worktree instead.
+                const busy = findWorktreeBusyBranch(state, branchName);
+                if (busy) {
+                    const choice = await vscode.window.showWarningMessage(
+                        `GitFocal: branch ${branchName} is already checked out in worktree ${busy.workTreePath}.`,
+                        'Open in New Window'
+                    );
+                    if (choice === 'Open in New Window') {
+                        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(busy.workTreePath), { forceNewWindow: true });
+                    }
+                    return;
+                }
+            }
             try {
                 if (isRemote) {
                     const slash = branchName.indexOf('/');
@@ -499,6 +514,12 @@ function isRemoteNode(arg) {
     return !!arg && typeof arg === 'object' && arg.kind === 'remote' && !!arg.remoteName;
 }
 
+/** Returns the branch record when it is checked out in another worktree. */
+function findWorktreeBusyBranch(state, branchName) {
+    const record = state.branches.find(b => !b.isRemote && b.name === branchName);
+    return record && record.checkedOutInOtherWorktree && record.workTreePath ? record : undefined;
+}
+
 /** Split "origin/feature/x" into { remote: 'origin', branch: 'feature/x' }. */
 function splitUpstream(upstream) {
     if (!upstream) {
@@ -537,6 +558,14 @@ async function deleteBranch(ctx, arg, force) {
         } catch (err) {
             reportGitError(err, `Failed to delete remote branch ${branchName}`);
         }
+        return;
+    }
+
+    const busy = findWorktreeBusyBranch(state, branchName);
+    if (busy) {
+        void vscode.window.showErrorMessage(
+            `GitFocal: cannot delete ${branchName} because it is checked out in worktree ${busy.workTreePath}. Remove the worktree first.`
+        );
         return;
     }
 

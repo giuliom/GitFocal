@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('path');
 const vscode = require('vscode');
 
 /**
@@ -64,6 +65,9 @@ function formatBranchDescription(branch) {
     const status = formatBranchStatus(branch);
     if (status) {
         segments.push(`(${status})`);
+    }
+    if (branch.checkedOutInOtherWorktree && branch.workTreePath) {
+        segments.push(`⌂ ${path.basename(branch.workTreePath)}`);
     }
     segments.push(branch.commitHash);
     return segments.join(' ');

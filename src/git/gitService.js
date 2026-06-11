@@ -4,7 +4,7 @@ const { execFile } = require('child_process');
 const path = require('path');
 const { GitError } = require('./gitTypes');
 const { resolveGitPath } = require('../utils/gitPathResolver');
-const { normalizeFsPath } = require('../utils/pathUtils');
+const { normalizeFsPath, pathsEqual } = require('../utils/pathUtils');
 
 // Remote tag status is only consulted for display. Keep it cached for a
 // while so watcher-driven refreshes don't hammer the network; fetch and
@@ -163,6 +163,9 @@ class GitService {
                 const b = branches.find(br => br.refName === wt.branch);
                 if (b) {
                     b.workTreePath = wt.path;
+                    // `repoPath` is the root of the worktree git ran in, so any
+                    // other worktree path means the branch is busy elsewhere.
+                    b.checkedOutInOtherWorktree = !pathsEqual(wt.path, repoPath);
                 }
             }
         } catch {
@@ -328,7 +331,9 @@ class GitService {
             let head;
             let branch;
             let isDetached = false;
+            let isBare = false;
             let isLocked = false;
+            let lockedReason;
             let isPrunable = false;
             for (const line of lines) {
                 if (line.startsWith('worktree ')) {
@@ -339,19 +344,27 @@ class GitService {
                     branch = line.substring('branch '.length).trim();
                 } else if (line.trim() === 'detached') {
                     isDetached = true;
+                } else if (line.trim() === 'bare') {
+                    isBare = true;
                 } else if (line.startsWith('locked')) {
                     isLocked = true;
+                    const reason = line.substring('locked'.length).trim();
+                    lockedReason = reason || undefined;
                 } else if (line.startsWith('prunable')) {
                     isPrunable = true;
                 }
             }
             if (p) {
                 worktrees.push({
-                    path: p,
+                    // Normalize so worktree paths compare equal to repo roots
+                    // coming from VS Code workspace folders.
+                    path: normalizeFsPath(p),
                     branch,
                     head,
                     isDetached,
+                    isBare,
                     isLocked,
+                    lockedReason,
                     isPrunable,
                     isMain: isFirst
                 });
@@ -359,6 +372,52 @@ class GitService {
             }
         }
         return worktrees;
+    }
+
+    // --- Worktree operations ---
+
+    /**
+     * Create a worktree at `wtPath`. Pass `options.branch` to check out an
+     * existing branch, or `options.newBranch` to create and check out a new
+     * branch (from HEAD).
+     */
+    async addWorkTree(repoPath, wtPath, options) {
+        const opts = options || {};
+        const args = ['worktree', 'add'];
+        if (opts.newBranch) {
+            args.push('-b', opts.newBranch);
+        }
+        args.push('--end-of-options', wtPath);
+        if (!opts.newBranch && opts.branch) {
+            args.push(opts.branch);
+        }
+        await this.exec(repoPath, args);
+    }
+
+    async removeWorkTree(repoPath, wtPath, force) {
+        const args = ['worktree', 'remove'];
+        if (force) {
+            args.push('--force');
+        }
+        args.push('--end-of-options', wtPath);
+        await this.exec(repoPath, args);
+    }
+
+    async lockWorkTree(repoPath, wtPath, reason) {
+        const args = ['worktree', 'lock'];
+        if (reason) {
+            args.push('--reason', reason);
+        }
+        args.push('--end-of-options', wtPath);
+        await this.exec(repoPath, args);
+    }
+
+    async unlockWorkTree(repoPath, wtPath) {
+        await this.exec(repoPath, ['worktree', 'unlock', '--end-of-options', wtPath]);
+    }
+
+    async pruneWorkTrees(repoPath) {
+        await this.exec(repoPath, ['worktree', 'prune']);
     }
 
     // --- Branch operations ---
@@ -1037,6 +1096,12 @@ function isPushRejectedError(err) {
     return /\[rejected\]|non-fast-forward|fetch first|failed to push some refs/i.test(detail);
 }
 
+/** True when `worktree remove` refused because the worktree has local changes. */
+function isWorkTreeDirtyError(err) {
+    const detail = err instanceof Error ? `${err.message}\n${err.stderr || ''}` : String(err || '');
+    return /contains modified or untracked files|use --force/i.test(detail);
+}
+
 function parseAheadBehind(track) {
     const result = { ahead: 0, behind: 0 };
     if (!track) {
@@ -1053,4 +1118,4 @@ function parseAheadBehind(track) {
     return result;
 }
 
-module.exports = { GitService, isDivergentPullError, isPushRejectedError };
+module.exports = { GitService, isDivergentPullError, isPushRejectedError, isWorkTreeDirtyError };

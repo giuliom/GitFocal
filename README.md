@@ -18,13 +18,20 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds four focused vie
 - Lists local branches with current-branch indicator, ahead/behind counts, and upstream info
 - Filter branches by name and sort by name or most recent commit
 - Shows a warning entry when HEAD is detached
-- Worktrees are grouped when more than one is present
 - Expanding a branch shows recent commits
 - Inline actions: checkout, fetch, pull, push, publish branch, reset current branch
 - Pull offers rebase/merge when branches have diverged; push offers force-with-lease when rejected
 - Context menu: create from, rename, delete (with force), merge, rebase, squash, reset, change upstream, copy branch name/upstream/commit hash
 - Commit actions: cherry-pick, revert, create tag at commit, copy commit hash
 - Toggle to hide submodule repositories from the Branches view
+
+### Worktrees
+
+- A Worktrees group in the Branches view lists each worktree with its branch and main/current/locked/prunable state
+- Add a worktree for an existing or new branch (from a branch's context menu or the view title), then open it in a new window or add it to the workspace
+- Remove (with force fallback for dirty worktrees), lock/unlock, and prune worktrees, or copy a worktree's path
+- Branches checked out in another worktree are marked with `⌂` and offer *Open Worktree in New Window* instead of checkout/delete
+- Refreshes also react to checkouts and ref changes made in linked worktrees
 
 ### Remotes view
 
@@ -134,7 +141,7 @@ src/
 
 ## TODO
 
-- [ ] Better support for worktrees and submodules
+- [ ] Better support for submodules
 - [ ] Group local branches by prefix (`feature/`, `fix/`, …)
 - [ ] Unit tests for `gitService` and providers
 - [ ] Publish to the VS Code Marketplace

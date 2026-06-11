@@ -119,8 +119,11 @@ class StateManager {
         this.entries.set(repoRoot, entry);
 
         try {
+            // `worktrees/**` covers the per-worktree HEAD/index files of linked
+            // worktrees (including this repo's own when the workspace folder is
+            // itself a linked worktree), plus worktree add/remove/lock metadata.
             const gitDir = await this.git.getGitDir(repoRoot);
-            const pattern = new vscode.RelativePattern(gitDir, '{HEAD,refs/**,packed-refs,index,MERGE_HEAD,REBASE_HEAD,stash}');
+            const pattern = new vscode.RelativePattern(gitDir, '{HEAD,refs/**,packed-refs,index,MERGE_HEAD,REBASE_HEAD,stash,worktrees/**}');
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
             const onAny = () => entry.refreshDebounced();
             watcher.onDidChange(onAny);

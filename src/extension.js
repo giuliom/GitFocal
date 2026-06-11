@@ -14,6 +14,7 @@ const { registerBranchCommands } = require('./commands/branchCommands');
 const { registerStashCommands } = require('./commands/stashCommands');
 const { registerTagCommands } = require('./commands/tagCommands');
 const { registerTopCommands } = require('./commands/topCommands');
+const { registerWorktreeCommands } = require('./commands/worktreeCommands');
 const { resetGitPathCache } = require('./utils/gitPathResolver');
 const preferences = require('./models/preferences');
 
@@ -56,6 +57,7 @@ async function activate(context) {
         ...registerBranchCommands(cmdCtx),
         ...registerStashCommands(cmdCtx),
         ...registerTagCommands(cmdCtx),
+        ...registerWorktreeCommands(cmdCtx),
         vscode.commands.registerCommand('gitfocal.loadMoreCommits', element => branchesProvider.loadMoreCommits(element)),
         vscode.commands.registerCommand('gitfocal.remotes.loadMoreCommits', element => remotesProvider.loadMoreCommits(element))
     );
