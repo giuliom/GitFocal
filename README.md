@@ -88,6 +88,24 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds four focused vie
 | Refresh focused GitFocal view | `Ctrl+Alt+R` / `Cmd+Alt+R` |
 | Fetch all repositories from Branches view | `Ctrl+Alt+F` / `Cmd+Alt+F` |
 
+## Running Tests
+
+Unit tests use Node's built-in test runner (`node:test`) with a stubbed `vscode` API — no test dependencies. They cover the git CLI output parsing, command construction, state management, tree providers, and utilities.
+
+```sh
+node --test test/
+# or
+npm test
+```
+
+With Deno:
+
+```sh
+deno test --allow-read test/
+```
+
+CI runs the suite on push and PR via `.github/workflows/test.yml`.
+
 ## Building the VSIX
 
 GitFocal has no transpile step. The extension runs directly from `src/`, and packaging is done with [`@vscode/vsce`](https://github.com/microsoft/vscode-vsce).
@@ -137,13 +155,17 @@ src/
   providers/                # tree data providers (branches, remotes, stashes, tags)
   ui/                       # icons and decorations
   utils/                    # debounce, git path resolver, repo filters
+test/
+  helpers/                  # vscode API stub + module-resolution bootstrap
+  *.test.cjs                # unit tests (node --test / deno test)
 ```
 
 ## TODO
 
 - [ ] Better support for submodules
 - [ ] Group local branches by prefix (`feature/`, `fix/`, …)
-- [ ] Unit tests for `gitService` and providers
+- [x] Unit tests for `gitService` and providers
+- [ ] Unit tests for the remaining providers (remotes, stashes, tags) and command handlers
 - [ ] Publish to the VS Code Marketplace
 
 ## License

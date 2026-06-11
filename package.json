@@ -25,6 +25,9 @@
   ],
   "main": "./src/extension.js",
   "icon": "assets/icon.png",
+  "scripts": {
+    "test": "node --test test/"
+  },
   "contributes": {
     "colors": [
       {

@@ -8,6 +8,32 @@
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}"
             ]
+        },
+        {
+            "name": "Run Tests (Node)",
+            "type": "node",
+            "request": "launch",
+            "runtimeArgs": [
+                "--test",
+                "${workspaceFolder}/test"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Run Tests (Deno)",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "deno",
+            "runtimeArgs": [
+                "test",
+                "--inspect-wait",
+                "--allow-read"
+            ],
+            "program": "${workspaceFolder}/test",
+            "cwd": "${workspaceFolder}",
+            "attachSimplePort": 9229,
+            "console": "integratedTerminal"
         }
     ]
 }
