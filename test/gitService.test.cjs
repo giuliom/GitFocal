@@ -382,6 +382,88 @@ test('pull maps modes to the right flags', async () => {
     ]);
 });
 
+test('getCommitMessage splits the subject from the body', async () => {
+    const git = fakeGit([
+        [args => args[0] === 'log', 'Fix the thing\x1fLonger explanation.\n\nSigned-off-by: x\n']
+    ]);
+    const msg = await git.getCommitMessage('/repo', 'abc');
+    assert.deepEqual(msg, {
+        subject: 'Fix the thing',
+        body: 'Longer explanation.\n\nSigned-off-by: x'
+    });
+});
+
+test('getCommitMessage handles a body-less commit', async () => {
+    const git = fakeGit([
+        [args => args[0] === 'log', 'Just a subject\x1f\n']
+    ]);
+    assert.deepEqual(await git.getCommitMessage('/repo', 'abc'), {
+        subject: 'Just a subject',
+        body: ''
+    });
+});
+
+test('editCommitMessage amends in place when the target is HEAD', async () => {
+    const git = fakeGit([
+        [args => args[0] === 'rev-parse' && args[1] === 'HEAD', 'aaaa\n'],
+        [args => args[0] === 'rev-parse', 'aaaa\n'],
+        [args => args[0] === 'commit', '']
+    ]);
+    await git.editCommitMessage('/repo', 'aaaa', 'New subject');
+    assert.deepEqual(git.calls, [
+        ['rev-parse', 'HEAD'],
+        ['rev-parse', '--verify', 'aaaa'],
+        ['commit', '--amend', '--only', '-m', 'New subject']
+    ]);
+});
+
+test('editCommitMessage rebuilds and replays when the target is older', async () => {
+    const handlers = [
+        [args => args[0] === 'rev-parse' && args[1] === 'HEAD', 'head1\n'],
+        [args => args[0] === 'rev-parse' && args[1] === '--verify', 'target1\n'],
+        [args => args[0] === 'merge-base', 'target1\n'],
+        [args => args[0] === 'rev-parse' && /\^\{tree\}$/.test(args[1]), 'tree1\n'],
+        [args => args[0] === 'rev-list', 'target1 parent1\n'],
+        [args => args[0] === 'log', 'Ada\x1fada@x.com\x1f2020-01-01T00:00:00Z'],
+        [args => args[0] === 'commit-tree', 'newcommit1\n'],
+        [args => args[0] === 'rebase', '']
+    ];
+    const git = fakeGit(handlers);
+    const envs = [];
+    const realExec = git.exec;
+    git.exec = async (repo, args, opts) => {
+        envs.push(opts && opts.env);
+        return realExec(repo, args, opts);
+    };
+    await git.editCommitMessage('/repo', 'target1', 'Reworded');
+
+    assert.deepEqual(git.calls.find(c => c[0] === 'commit-tree'),
+        ['commit-tree', 'tree1', '-p', 'parent1', '-m', 'Reworded']);
+    assert.deepEqual(git.calls.find(c => c[0] === 'rebase'),
+        ['rebase', '--onto', 'newcommit1', 'target1']);
+    // The original author is preserved on the rebuilt commit.
+    const commitTreeIdx = git.calls.findIndex(c => c[0] === 'commit-tree');
+    assert.deepEqual(envs[commitTreeIdx], {
+        GIT_AUTHOR_NAME: 'Ada',
+        GIT_AUTHOR_EMAIL: 'ada@x.com',
+        GIT_AUTHOR_DATE: '2020-01-01T00:00:00Z'
+    });
+});
+
+test('editCommitMessage refuses commits that are not on the current branch', async () => {
+    const git = fakeGit([
+        [args => args[0] === 'rev-parse' && args[1] === 'HEAD', 'head1\n'],
+        [args => args[0] === 'rev-parse' && args[1] === '--verify', 'sidebranch1\n'],
+        // merge-base of HEAD and the target is some shared ancestor, not the
+        // target itself: the commit lives on another branch.
+        [args => args[0] === 'merge-base', 'ancestor1\n']
+    ]);
+    await assert.rejects(
+        () => git.editCommitMessage('/repo', 'sidebranch1', 'Reworded'),
+        /not on the current branch/);
+    assert.equal(git.calls.some(c => c[0] === 'commit-tree'), false);
+});
+
 // --- error classifiers ---
 
 test('isDivergentPullError matches divergence messages only', () => {

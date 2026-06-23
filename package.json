@@ -98,6 +98,7 @@
       { "command": "gitfocal.copyCommit", "title": "Copy Commit Hash", "icon": "$(copy)" },
       { "command": "gitfocal.cherryPickCommit", "title": "Cherry-pick Commit", "icon": "$(git-merge)" },
       { "command": "gitfocal.revertCommit", "title": "Revert Commit", "icon": "$(discard)" },
+      { "command": "gitfocal.editCommitMessage", "title": "Edit Commit Message...", "icon": "$(edit)" },
       { "command": "gitfocal.loadMoreCommits", "title": "Load More Commits" },
 
       { "command": "gitfocal.stashApply", "title": "Apply", "icon": "$(check)" },
@@ -209,6 +210,7 @@
         { "command": "gitfocal.copyCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "9_copy@1" },
         { "command": "gitfocal.cherryPickCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "1_commit@1" },
         { "command": "gitfocal.revertCommit", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "1_commit@3" },
+        { "command": "gitfocal.editCommitMessage", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "1_commit@4" },
         { "command": "gitfocal.reset", "when": "view == gitfocal.branches && viewItem =~ /^commit/", "group": "3_history@1" },
 
         { "command": "gitfocal.stashDiff", "when": "view == gitfocal.stashes && viewItem == stash", "group": "inline@0" },
@@ -294,6 +296,7 @@
         { "command": "gitfocal.copyCommit", "when": "false" },
         { "command": "gitfocal.cherryPickCommit", "when": "false" },
         { "command": "gitfocal.revertCommit", "when": "false" },
+        { "command": "gitfocal.editCommitMessage", "when": "false" },
         { "command": "gitfocal.loadMoreCommits", "when": "false" },
         { "command": "gitfocal.stashApply", "when": "false" },
         { "command": "gitfocal.stashPop", "when": "false" },

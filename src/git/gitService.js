@@ -35,7 +35,12 @@ class GitService {
                     cwd: repoPath,
                     maxBuffer: options.maxBuffer || 50 * 1024 * 1024,
                     windowsHide: true,
-                    env: Object.assign({}, process.env, { GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' })
+                    env: Object.assign(
+                        {},
+                        process.env,
+                        { GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' },
+                        options.env || {}
+                    )
                 },
                 (err, stdout, stderr) => {
                     if (err) {
@@ -460,6 +465,84 @@ class GitService {
 
     async revertCommit(repoPath, hash) {
         await this.exec(repoPath, ['revert', '--no-edit', '--end-of-options', hash]);
+    }
+
+    /** Return the subject (first line) and body of a commit's message. */
+    async getCommitMessage(repoPath, hash) {
+        const SEP = '\x1f';
+        const out = await this.exec(repoPath,
+            ['log', '-n1', `--format=%s${SEP}%b`, '--end-of-options', hash]);
+        const idx = out.indexOf(SEP);
+        if (idx < 0) {
+            return { subject: out.replace(/[\r\n]+$/, ''), body: '' };
+        }
+        return {
+            subject: out.slice(0, idx),
+            body: out.slice(idx + 1).replace(/[\r\n]+$/, '')
+        };
+    }
+
+    /**
+     * Reword a commit on the current branch. Editing HEAD is a plain `--amend`
+     * (with `--only` so staged changes are left in the index instead of being
+     * folded into the commit). Editing an older commit rebuilds it with
+     * `commit-tree`, preserving the original author, then replays its
+     * descendants with `rebase --onto`. Because only the message changes, the
+     * rebuilt commit keeps the same tree, so the replayed patches always apply
+     * cleanly and no conflict handling is required. Commits that are not
+     * ancestors of HEAD (e.g. on another branch) are rejected, since rewording
+     * them would mean moving a branch that is not checked out.
+     */
+    async editCommitMessage(repoPath, hash, message) {
+        const head = (await this.exec(repoPath, ['rev-parse', 'HEAD'])).trim();
+        // `rev-parse` echoes `--end-of-options` rather than honouring it, so we
+        // use `--verify` to resolve the (trusted, full-SHA) target instead.
+        const target = (await this.exec(repoPath, ['rev-parse', '--verify', hash])).trim();
+
+        if (target === head) {
+            await this.exec(repoPath, ['commit', '--amend', '--only', '-m', message]);
+            return;
+        }
+
+        let mergeBase = '';
+        try {
+            mergeBase = (await this.exec(repoPath, ['merge-base', 'HEAD', target])).trim();
+        } catch {
+            mergeBase = '';
+        }
+        if (mergeBase !== target) {
+            throw new GitError(
+                'This commit is not on the current branch. Check out its branch to edit it.',
+                'gitfocal edit-commit-message', '');
+        }
+
+        const tree = (await this.exec(repoPath, ['rev-parse', `${target}^{tree}`])).trim();
+        const parentLine = (await this.exec(repoPath, ['rev-list', '--parents', '-n1', target])).trim();
+        const parents = parentLine.split(/\s+/).slice(1).filter(Boolean);
+        const [authorName, authorEmail, authorDate] = (await this.exec(repoPath,
+            ['log', '-n1', '--format=%an%x1f%ae%x1f%aI', target])).trim().split('\x1f');
+
+        const args = ['commit-tree', tree];
+        for (const parent of parents) {
+            args.push('-p', parent);
+        }
+        args.push('-m', message);
+        const newHash = (await this.exec(repoPath, args, {
+            env: {
+                GIT_AUTHOR_NAME: authorName,
+                GIT_AUTHOR_EMAIL: authorEmail,
+                GIT_AUTHOR_DATE: authorDate
+            }
+        })).trim();
+
+        try {
+            await this.exec(repoPath, ['rebase', '--onto', newHash, target]);
+        } catch (err) {
+            // A reword never produces conflicts, but if the rebase is somehow
+            // interrupted, abort it so the working tree is left as we found it.
+            await this.exec(repoPath, ['rebase', '--abort'], { allowFailure: true });
+            throw err;
+        }
     }
 
     async fetchRemote(repoPath, remote) {

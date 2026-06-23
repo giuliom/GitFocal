@@ -23,7 +23,7 @@ A no-frills Visual Studio Code extension for Git. GitFocal adds four focused vie
 - Inline actions: checkout, fetch, pull, push, publish branch, reset current branch
 - Pull offers rebase/merge when branches have diverged; push offers force-with-lease when rejected
 - Context menu: create from, rename, delete (with force), merge, rebase, squash, reset, change upstream, copy branch name/upstream/commit hash
-- Commit actions: cherry-pick, revert, create tag at commit, copy commit hash
+- Commit actions: edit message (reword), cherry-pick, revert, create tag at commit, copy commit hash
 - Toggle to hide submodule repositories from the Branches view
 
 ### Worktrees

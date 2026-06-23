@@ -435,6 +435,47 @@ function registerBranchCommands(ctx) {
             }
         }),
 
+        vscode.commands.registerCommand('gitfocal.editCommitMessage', async (arg) => {
+            if (!arg || arg.kind !== 'commit' || !arg.commit) {
+                return;
+            }
+            const repo = await pickRepo(stateManager, arg.repoPath);
+            if (!repo) {
+                return;
+            }
+            let current;
+            try {
+                current = await git.getCommitMessage(repo.repoPath, arg.commit.hash);
+            } catch (err) {
+                reportGitError(err, 'Failed to read commit message');
+                return;
+            }
+            const newSubject = await vscode.window.showInputBox({
+                title: 'Edit Commit Message',
+                prompt: current.body
+                    ? 'Edit the commit subject (the body is preserved)'
+                    : 'Edit the commit message',
+                value: current.subject,
+                validateInput: v => v && v.trim() ? null : 'Commit message cannot be empty'
+            });
+            if (newSubject === undefined) {
+                return;
+            }
+            const trimmed = newSubject.trim();
+            if (trimmed === current.subject) {
+                return;
+            }
+            const message = current.body ? `${trimmed}\n\n${current.body}` : trimmed;
+            const short = arg.commit.shortHash || arg.commit.hash.substring(0, 7);
+            try {
+                await withProgress(`Edit message of ${short}`,
+                    () => git.editCommitMessage(repo.repoPath, arg.commit.hash, message));
+                await stateManager.refresh(repo.repoPath);
+            } catch (err) {
+                reportGitError(err, `Failed to edit message of ${short}`);
+            }
+        }),
+
         vscode.commands.registerCommand('gitfocal.renameBranch', async (arg) => {
             const resolved = await resolveBranchNode(stateManager, arg, {
                 localOnly: true,
